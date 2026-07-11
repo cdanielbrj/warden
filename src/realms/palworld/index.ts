@@ -1,7 +1,7 @@
 import { Logger } from "../../core/logger/Logger.js";
 import type { Realm } from "../../core/types/Realm.js";
 import { palworldEnv } from "./config/env.js";
-import { verifyRconConnection } from "./services/RconConnection.js";
+import { RconClient } from "./services/RconConnection.js";
 
 export function createRealm(): Realm {
   return {
@@ -10,12 +10,23 @@ export function createRealm(): Realm {
     async initialize() {
       const target = `${palworldEnv.rconHost}:${palworldEnv.rconPort}`;
 
-      Logger.info(`Testing RCON connection to ${target}.`);
-      await verifyRconConnection(
+      Logger.info(`Authenticating RCON connection to ${target}.`);
+      const rcon = await RconClient.connect(
         palworldEnv.rconHost,
         palworldEnv.rconPort,
       );
-      Logger.success(`RCON target ${target} is reachable.`);
+
+      try {
+        await rcon.authenticate(palworldEnv.rconPassword);
+        const info = await rcon.execute("Info");
+        Logger.success(`RCON authentication succeeded for ${target}.`);
+
+        if (info) {
+          Logger.info(`RCON Info: ${info.replace(/\s+/g, " ").trim()}`);
+        }
+      } finally {
+        rcon.close();
+      }
     },
   };
 }

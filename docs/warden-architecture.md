@@ -192,6 +192,8 @@ The root `.env.example` is the single configuration template for a Warden contai
 
 Each deployed container must receive its own environment file or secret set. The Docker Compose file must not hard-code a particular Guardian name.
 
+RCON transmits its password without transport encryption. RCON endpoints must remain private to the LAN or host-local Docker network and must never be exposed through a public tunnel or proxy.
+
 The Core loads the module at `src/realms/<REALM>/index.ts` without enumerating or importing individual games. Each Realm module must export `createRealm()`, which returns the shared `Realm` contract.
 
 ---
@@ -312,7 +314,7 @@ The Discord Public Key is not required for the gateway-based `discord.js` client
 
 The RCON settings are present in the template before the RCON client is implemented, so a deployment has one stable configuration format. A Realm that does not use RCON ignores them.
 
-During the initial Palworld phase, Warden verifies TCP reachability to the configured RCON target during startup. RCON authentication and game commands are introduced separately after this deployment-level connectivity check succeeds.
+During the initial Palworld phase, Warden authenticates against the configured RCON target and executes the safe `Info` query during startup. Additional game commands are introduced separately after this deployment-level check succeeds.
 
 Secrets must never be committed.
 
