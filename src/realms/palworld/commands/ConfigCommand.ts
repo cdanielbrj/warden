@@ -1,7 +1,16 @@
-import { MessageFlags, SlashCommandBuilder } from "discord.js";
+import {
+  MessageFlags,
+  SlashCommandBuilder,
+  type AutocompleteInteraction,
+} from "discord.js";
 import type { GuardianCommand } from "../../../core/types/Command.js";
 import type { PalworldSetting } from "../config/PalworldSettingsParser.js";
-import { requireAdmin } from "../permissions/Admin.js";
+import {
+  getPalworldSettingDefinition,
+  getPalworldSettingValueSuggestions,
+  palworldSettingsRegistry,
+} from "../config/SettingsRegistry.js";
+import { isAdminUser, requireAdmin } from "../permissions/Admin.js";
 import { PalworldSettingsService } from "../services/PalworldSettingsService.js";
 
 const MAX_RESPONSE_LENGTH = 1_800;
@@ -27,6 +36,26 @@ export function createConfigCommand(
             option
               .setName("key")
               .setDescription("Exact Palworld setting key")
+              .setAutocomplete(true)
+              .setRequired(true),
+          ),
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("set")
+          .setDescription("Update one existing Palworld setting")
+          .addStringOption((option) =>
+            option
+              .setName("key")
+              .setDescription("Exact Palworld setting key")
+              .setAutocomplete(true)
+              .setRequired(true),
+          )
+          .addStringOption((option) =>
+            option
+              .setName("value")
+              .setDescription("New setting value")
+              .setAutocomplete(true)
               .setRequired(true),
           ),
       ),
@@ -37,8 +66,20 @@ export function createConfigCommand(
       }
 
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      const document = await service.read();
       const subcommand = interaction.options.getSubcommand();
+
+      if (subcommand === "set") {
+        const key = interaction.options.getString("key", true);
+        const value = interaction.options.getString("value", true);
+        const update = await service.update(key, value);
+
+        await interaction.editReply(
+          `${formatSetting({ key, rawValue: update.value })}\nBackup created: ${update.backupPath}\nRestart the server with /shutdown to apply this setting.`,
+        );
+        return;
+      }
+
+      const document = await service.read();
 
       if (subcommand === "get") {
         const key = interaction.options.getString("key", true);
@@ -54,7 +95,50 @@ export function createConfigCommand(
 
       await respondWithSettings(interaction, document.settings);
     },
+
+    async autocomplete(interaction) {
+      await respondToConfigAutocomplete(interaction);
+    },
   };
+}
+
+async function respondToConfigAutocomplete(
+  interaction: AutocompleteInteraction,
+): Promise<void> {
+  if (!isAdminUser(interaction.user.id)) {
+    await interaction.respond([]);
+    return;
+  }
+
+  const focused = interaction.options.getFocused(true);
+  const query = String(focused.value).toLowerCase();
+
+  if (focused.name === "key") {
+    await interaction.respond(
+      palworldSettingsRegistry
+        .filter((setting) => setting.key.toLowerCase().includes(query))
+        .slice(0, 25)
+        .map((setting) => ({
+          name: `${setting.key} (${setting.kind})`,
+          value: setting.key,
+        })),
+    );
+    return;
+  }
+
+  const key = interaction.options.getString("key");
+  const definition = key ? getPalworldSettingDefinition(key) : undefined;
+  const values = key ? getPalworldSettingValueSuggestions(key) : [];
+
+  await interaction.respond(
+    values
+      .filter((value) => value.toLowerCase().includes(query))
+      .slice(0, 25)
+      .map((value) => ({
+        name: definition ? `${value} (${definition.kind})` : value,
+        value,
+      })),
+  );
 }
 
 async function respondWithSettings(

@@ -4,15 +4,17 @@ import { createPalworldCommands } from "./commands/index.js";
 import { palworldEnv } from "./config/env.js";
 import { RconClient } from "./services/RconConnection.js";
 import { PalworldRconService } from "./services/PalworldRconService.js";
+import { PalworldBackupService } from "./services/PalworldBackupService.js";
 import { PalworldSettingsService } from "./services/PalworldSettingsService.js";
 
 export function createRealm(): Realm {
   const rcon = new PalworldRconService();
-  const settings = new PalworldSettingsService();
+  const backups = new PalworldBackupService(rcon);
+  const settings = new PalworldSettingsService(backups);
 
   return {
     name: "Palworld",
-    commands: createPalworldCommands(rcon, settings),
+    commands: createPalworldCommands(rcon, settings, backups),
 
     async initialize() {
       const target = `${palworldEnv.rconHost}:${palworldEnv.rconPort}`;

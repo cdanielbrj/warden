@@ -1,10 +1,14 @@
 import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
 import { env } from "../../../core/config/env.js";
 
+export function isAdminUser(userId: string): boolean {
+  return env.discordAdminUserIds.includes(userId);
+}
+
 export async function requireAdmin(
   interaction: ChatInputCommandInteraction,
 ): Promise<boolean> {
-  if (env.discordAdminUserIds.includes(interaction.user.id)) {
+  if (isAdminUser(interaction.user.id)) {
     return true;
   }
 

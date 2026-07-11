@@ -13,6 +13,27 @@ export async function bootstrapBot() {
   const client = createDiscordClient();
 
   client.on("interactionCreate", async (interaction) => {
+    if (interaction.isAutocomplete()) {
+      const command = realm.commands.find(
+        (candidate) => candidate.data.name === interaction.commandName,
+      );
+
+      if (!command?.autocomplete) {
+        await interaction.respond([]);
+        return;
+      }
+
+      try {
+        await command.autocomplete(interaction);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        Logger.error(`Autocomplete ${interaction.commandName} failed: ${message}`);
+        await interaction.respond([]);
+      }
+
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) {
       return;
     }
