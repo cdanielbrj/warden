@@ -1,7 +1,9 @@
 # Warden — Architecture and Implementation Guide
 
 **Status:** Accepted baseline  
-**Architecture version:** 0.1  
+**Software version:** 0.1.0
+**Architecture baseline:** 0.2
+**Document revision:** 2026-07-11
 **Initial Guardian:** Lady Astra  
 **Initial Realm:** Palworld  
 **Runtime:** Docker only  
@@ -72,17 +74,62 @@ For the first version:
 - Realm: Palworld
 - Target: one Palworld dedicated server
 
+### Target
+
+The concrete game-server deployment controlled by a Guardian.
+
+A Target has a stable technical identifier such as:
+
+- `palworld`
+- `palworld2`
+- `valheim`
+
+The Target identifier is independent from both the Guardian identity and the Realm.
+
+Examples:
+
+```text
+Lady Astra
+Guardian ID: astra
+Realm: palworld
+Target: palworld2
+```
+
+```text
+Lady Iris
+Guardian ID: iris
+Realm: palworld
+Target: palworld
+```
+
+Multiple Guardians may use the same Realm while controlling different Targets.
+
 ### Server
 
-The single game-server instance controlled by the running Guardian.
+The single game-server instance represented by a Target and controlled by the running Guardian.
 
-In the current architecture, a Warden container never needs to discover or select among multiple servers. Each container controls exactly one target server.
+In the Guardian runtime, a Warden container never needs to discover or select among multiple servers. Each container controls exactly one Target.
 
 ### Lady Warden
 
-A possible future hub or coordinator.
+The future supervisor of the Warden ecosystem.
 
-Lady Warden is explicitly outside the first implementation. It may later aggregate status or delegate operations across multiple Guardians.
+Lady Warden uses the same repository and Docker image as every other Guardian, but operates at a different level of authority.
+
+Lady Warden is responsible for cross-Guardian and infrastructure concerns such as:
+
+- Guardian health aggregation;
+- maintenance orchestration;
+- schedules and recurring lifecycle operations;
+- container lifecycle through a restricted controller;
+- centralized alerts and audit;
+- coordinated operations across multiple Guardians.
+
+Lady Warden does not replace individual Guardians and must not implement game-specific behavior directly. Guardians remain autonomous and own all Realm-specific operations.
+
+The architectural distinction is:
+
+> Individual Guardians administer game servers. Lady Warden administers the Warden ecosystem.
 
 ---
 
@@ -108,8 +155,18 @@ The Core must not:
 - contain player, save, broadcast, shutdown, kick, or ban behavior;
 - know Palworld connection details;
 - contain game-specific permission rules;
-- choose between multiple game servers;
+- choose between multiple game servers in the Guardian runtime;
 - contain `if game === "palworld"` branches spread across the application.
+
+Additional accepted rules:
+
+> A Guardian identity is not a Realm and is not a Target.
+
+> Discord is the human interface and audit surface. Coordination between Warden services must use authenticated private service-to-service communication, not bot messages as a command transport.
+
+> Lady Warden coordinates infrastructure and Guardians. Individual Guardians perform Realm-specific work.
+
+> Lady Warden must never receive unrestricted access to the Docker host.
 
 ---
 
@@ -137,6 +194,20 @@ ghcr.io/<owner>/warden:latest
 ```
 
 Multiple containers must never share the same Discord bot token.
+
+A Guardian identity represents a deployment, not a game category. Two Palworld servers therefore use two distinct Guardian identities and Discord Applications:
+
+```text
+Lady Astra
+├── Realm: palworld
+└── Target: palworld
+
+Lady Iris
+├── Realm: palworld
+└── Target: palworld2
+```
+
+The shared Palworld Realm code is reused by both containers. Their tokens, Target paths, RCON configuration, permissions, and visual identities remain isolated.
 
 ---
 
@@ -175,7 +246,7 @@ docker compose exec warden npm run build
 
 ### Runtime configuration
 
-The shared image is configured per Guardian through environment variables. Core configuration is common to every Realm:
+The shared image is configured per Guardian through environment variables. Current `0.1.0` Core configuration is common to every Realm:
 
 - `GUARDIAN_NAME`
 - `REALM`
@@ -189,13 +260,92 @@ Each Realm owns the validation of its game-specific needs. Realms that connect t
 - `RCON_PORT`
 - `RCON_PASSWORD`
 
+The accepted identity model for a future migration is:
+
+- `GUARDIAN_ID`: canonical identity such as `astra`, `iris`, or `warden`;
+- `TARGET_ID`: stable deployment identifier such as `palworld`, `palworld2`, or `valheim`;
+- `REALM`: game implementation loaded by the Guardian.
+
+`GUARDIAN_NAME` remains the current implemented field in `0.1.0`. It should eventually become a display name derived from `GUARDIAN_ID`, rather than unrestricted identity input.
+
 The root `.env.example` is the single configuration template for a Warden container. It contains shared settings and the connection capabilities currently used by the project. A Realm ignores values it does not use and validates the values it requires.
 
-Each deployed container must receive its own environment file or secret set. The Docker Compose file must not hard-code a particular Guardian name.
+Each deployed container must receive its own environment file or secret set. The Docker Compose file must not hard-code a particular Guardian identity.
 
 RCON transmits its password without transport encryption. RCON endpoints must remain private to the LAN or host-local Docker network and must never be exposed through a public tunnel or proxy.
 
-The Core loads the module at `src/realms/<REALM>/index.ts` without enumerating or importing individual games. Each Realm module must export `createRealm()`, which returns the shared `Realm` contract.
+The Core resolves `REALM` through a centralized explicit registry and imports
+only the selected Realm. Each Realm module must export `createRealm()`, which
+returns the shared `Realm` contract.
+
+### Mini PC storage convention
+
+Game-server data follows a stable host-side layout:
+
+```text
+/mnt/user/games/<TARGET_ID>/serverfiles/
+```
+
+Examples:
+
+```text
+/mnt/user/games/palworld/serverfiles/
+/mnt/user/games/palworld2/serverfiles/
+/mnt/user/games/valheim/serverfiles/
+```
+
+Warden-managed backups follow the matching host-side convention:
+
+```text
+/mnt/user/games/backups/<TARGET_ID>/
+```
+
+Examples:
+
+```text
+/mnt/user/games/backups/palworld/
+/mnt/user/games/backups/palworld2/
+/mnt/user/games/backups/valheim/
+```
+
+For Palworld, the effective settings file is always resolved relative to the Target server-files root:
+
+```text
+Pal/Saved/Config/LinuxServer/PalWorldSettings.ini
+```
+
+Therefore, the full host path is:
+
+```text
+/mnt/user/games/<TARGET_ID>/serverfiles/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini
+```
+
+Warden code must not hard-code `/mnt/user` host paths. Unraid maps the
+Target-specific server-files directory to the stable container path:
+
+```text
+/data/serverfiles
+```
+
+Current volume mappings for a Palworld Guardian are read/write because configuration edits and backups are implemented:
+
+```yaml
+volumes:
+  - /mnt/user/games/<TARGET_ID>/serverfiles:/data/serverfiles:rw
+  - /mnt/user/games/backups/<TARGET_ID>:/data/backups:rw
+```
+
+For example, Lady Iris maps `palworld` to those paths and Lady Astra maps `palworld2`. Each Guardian receives only the mounts for its own Target.
+
+The Realm resolves its own files relative to these stable container roots. The Palworld Realm therefore resolves:
+
+```text
+/data/serverfiles/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini
+```
+
+The backup mount stores Warden-managed snapshots under `config/` and `world/`.
+`SERVER_FILES_ROOT` and `BACKUP_ROOT` are intentionally not environment
+variables while the fixed container-path contract is sufficient.
 
 ---
 
@@ -304,6 +454,13 @@ RCON_PORT=
 RCON_PASSWORD=
 ```
 
+Accepted future identity fields:
+
+```env
+GUARDIAN_ID=astra
+TARGET_ID=palworld
+```
+
 Definitions:
 
 - `GUARDIAN_NAME`: human-readable Guardian identity used in logs and responses.
@@ -312,6 +469,8 @@ Definitions:
 - `DISCORD_CLIENT_ID`: Discord Application ID.
 - `DISCORD_ADMIN_USER_IDS`: comma-separated Discord user IDs authorized to administer the Guardian.
 - `RCON_HOST`, `RCON_PORT`, and `RCON_PASSWORD`: generic RCON connection settings. They are required and validated only by a Realm that uses RCON.
+- `GUARDIAN_ID`: planned canonical Guardian identity.
+- `TARGET_ID`: planned stable Target identifier and storage-directory key.
 
 The Discord Public Key is not required for the gateway-based `discord.js` client used by this project.
 
@@ -346,7 +505,7 @@ Expected startup logs:
 [INFO] Starting Warden...
 [INFO] Authenticating RCON connection to <host>:<port>.
 [SUCCESS] RCON authentication succeeded for <host>:<port>.
-[SUCCESS] Registered 4 global Discord command(s).
+[SUCCESS] Registered 6 global Discord command(s).
 [SUCCESS] Logged as Lady Astra#4463
 [SUCCESS] Lady Astra is watching Palworld.
 ```
@@ -390,15 +549,21 @@ Suggested shape when slash-command registration begins:
 
 ```ts
 import type {
+  AutocompleteInteraction,
   ChatInputCommandInteraction,
   SlashCommandBuilder,
   SlashCommandOptionsOnlyBuilder,
+  SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 
 export interface GuardianCommand {
-  readonly data: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder;
+  readonly data:
+    | SlashCommandBuilder
+    | SlashCommandOptionsOnlyBuilder
+    | SlashCommandSubcommandsOnlyBuilder;
 
   execute(interaction: ChatInputCommandInteraction): Promise<void>;
+  autocomplete?(interaction: AutocompleteInteraction): Promise<void>;
 }
 ```
 
@@ -473,14 +638,18 @@ Commands are registered globally for the Guardian's Discord Application. A Guard
 
 ### Implemented Palworld commands
 
-The first MVP exposes four global slash commands, all restricted to `DISCORD_ADMIN_USER_IDS`:
+The current Palworld Realm exposes six global slash commands, all restricted to `DISCORD_ADMIN_USER_IDS`:
 
 - `/status`: show server information through RCON `Info`;
 - `/players`: show connected player names through RCON `ShowPlayers`;
 - `/save`: save world data through RCON `Save`;
 - `/shutdown`: schedule a graceful shutdown through RCON `Shutdown` after an explicit Discord button confirmation.
+- `/config`: show the parsed settings, get a setting, or set a catalogued setting;
+- `/backup`: create a configuration backup or a world snapshot.
 
-All command responses are ephemeral. `/shutdown` requires a countdown between 10 and 3,600 seconds and a player-facing message.
+All command responses are ephemeral. `/shutdown` requires a countdown between 10 and 3,600 seconds and a player-facing message. `/config get` and `/config set` offer Discord autocomplete from the Realm's settings catalogue; value autocomplete is available for boolean and enumerated settings.
+
+`/config set` validates the key and value, calls the same configuration-backup service as `/backup config`, writes a temporary file, and atomically renames it into place. It never restarts the server implicitly; an administrator uses `/shutdown` to apply restart-dependent changes. `/backup world` calls RCON `Save` before copying active `SaveGames` data into Warden's backup mount. Palworld's native rotating directories named `backup` are excluded from that copy only; the game source is never modified or deleted.
 
 ---
 
@@ -605,9 +774,9 @@ Behavior:
 
 ### RCON errors
 
-To be implemented later.
+Implemented for the Palworld MVP.
 
-Expected distinction:
+The RCON layer must continue to distinguish:
 
 - connection refused;
 - authentication failed;
@@ -615,6 +784,8 @@ Expected distinction:
 - malformed response;
 - unsupported command;
 - server unavailable.
+
+Discord-facing responses remain generic and must never expose passwords, internal stack traces, or unnecessary network details.
 
 ---
 
@@ -680,13 +851,23 @@ Already validated:
 - The Discord client reaches the ready state.
 - Terminal logger produces timestamped messages.
 - The `ready` event was changed to `clientReady` to avoid the deprecation warning.
+- Palworld configuration management parses `PalWorldSettings.ini`, preserves
+  unknown source content, validates catalogued keys and values, creates a
+  timestamped backup, and applies atomic updates through the production
+  image's `/data/serverfiles` mount contract.
+- Lady Iris validated `/config show`, `/config get`, autocomplete, sequential
+  `/config set` updates, configuration backups, and restart persistence against
+  the real Palworld server.
 
 Current successful output is conceptually:
 
 ```text
 [INFO] Starting Warden...
+[INFO] Authenticating RCON connection to <host>:<port>.
+[SUCCESS] RCON authentication succeeded for <host>:<port>.
+[SUCCESS] Registered 6 global Discord command(s).
 [SUCCESS] Logged as Lady Astra#4463
-[SUCCESS] Lady Astra is watching.
+[SUCCESS] Lady Astra is watching Palworld.
 ```
 
 ---
@@ -756,7 +937,7 @@ Scope:
 - confirmation for critical actions;
 - administrative audit logs (future).
 
-### Phase 5 — Production delivery
+### Phase 5 — Production delivery — Complete
 
 Scope:
 
@@ -767,9 +948,49 @@ Scope:
 - health checks;
 - versioned releases.
 
-### Future — Lady Warden hub
+### Phase 6 — Palworld configuration management — Operational validation
 
-Out of scope until multiple independent Guardians are stable.
+Scope:
+
+- resolve `PalWorldSettings.ini` from the stable Target storage layout;
+- parse `OptionSettings=(...)` without losing unknown fields or formatting-critical values;
+- expose read and write configuration commands with autocomplete;
+- create timestamped configuration backups and world snapshots.
+
+Completed delivery sequence:
+
+1. validate `/config show` and `/config get` against Lady Iris's actual file;
+2. add catalogue-backed edits and autocomplete;
+3. add shared configuration backup creation and atomic replacement;
+4. validate sequential edits and restart persistence on Lady Iris.
+
+The remaining operational check is `/backup world` after excluding the unstable native Palworld `backup` history from the Warden snapshot. Future work can add a diff, rollback, and restart reporting.
+
+### Future — Lady Warden supervisor
+
+Lady Warden remains out of scope until multiple independent Guardians are stable.
+
+Accepted future responsibilities:
+
+- health aggregation;
+- authenticated coordination with Guardians;
+- schedules such as daily server restarts;
+- orchestration of prepare, stop, container restart, and post-restart validation;
+- centralized alerts and audit;
+- restricted container lifecycle management.
+
+Lady Warden uses the same repository and Docker image as individual Guardians,
+but will be a future supervisor mode rather than a game Realm.
+
+Individual Guardians remain necessary because they own Realm-specific work. Lady Warden must communicate with them through a private authenticated service contract rather than by sending Discord commands or parsing bot messages.
+
+Any future Docker integration must be restricted to Warden-managed containers, preferably through a limited controller or Docker Socket Proxy and labels such as:
+
+```text
+warden.managed=true
+warden.guardian=astra
+warden.realm=palworld
+```
 
 ---
 
@@ -844,31 +1065,27 @@ Never commit:
 
 ---
 
-## 21. Non-goals for the first version
+## 21. Non-goals for version 0.2.x
 
-Do not implement these during Phase 1:
+The following capabilities remain outside the immediate Palworld configuration-management delivery:
 
-- multiple servers in one container;
-- multiple Realms in one process;
+- multiple servers in one Guardian container;
+- multiple Realms in one Guardian process;
 - selection menus for server instances;
-- a Lady Warden hub;
-- REST or GraphQL APIs;
+- Lady Warden implementation;
+- unrestricted Docker socket access;
+- REST or GraphQL public APIs;
 - a web interface;
 - database-backed permissions;
 - dynamic module installation;
 - hot-swapping Realms;
-- Docker socket control;
-- game-server restart through Docker;
-- backups;
-- scheduled tasks;
-- public RCON exposure;
+- automated game-server updates;
 - VPN management;
 - Playit.gg integration.
 
-These may be reconsidered after the basic Palworld administration workflow is stable.
+Configuration backups and rollback are explicitly in scope for the Palworld configuration phase.
 
 ---
-
 ## 22. Security principles
 
 1. RCON remains private to the local Docker or LAN network.
@@ -881,6 +1098,10 @@ These may be reconsidered after the basic Palworld administration workflow is st
 8. Each Guardian uses a distinct Discord Application and token.
 9. The bot should request only the Discord permissions and gateway intents it actually needs.
 10. No privileged Docker socket access should be introduced without a specific reviewed need.
+11. Host paths must be injected through container mounts; application code must not hard-code Unraid host paths.
+12. A Guardian may access only the Target server files and backup directory mounted into its own container.
+13. Configuration writes require backup, validation, temporary-file generation, and atomic replacement.
+14. Lady Warden must use restricted infrastructure control and may act only on explicitly Warden-managed containers.
 
 ---
 
@@ -903,14 +1124,23 @@ When modifying this repository:
 13. Treat this document as the current architectural source of truth.
 14. When code and this document conflict, identify the conflict before changing the architecture.
 15. Update this document when an accepted architectural decision changes.
+16. Treat `GUARDIAN_ID`, `REALM`, and `TARGET_ID` as separate concepts.
+17. Resolve Target files from mounted container roots; never build application paths from `/mnt/user`.
+18. Preserve unknown Palworld settings when parsing and rewriting `OptionSettings`.
+19. Write the real Palworld settings file only through validation, a shared
+    configuration backup, temporary-file generation, and atomic replacement.
+20. Use the writable backup mount only for Warden-managed snapshots of that
+    Guardian's Target.
 
 ---
 
 ## 24. Next task
 
-The `0.1.0` MVP now has a production runtime image. The next delivery phase is release and operational hardening:
+Validate the world-backup correction on Lady Iris:
 
-1. add a container health check appropriate to the Guardian lifecycle;
-2. commit and tag a versioned release;
-3. publish a versioned GHCR image;
-4. deploy the versioned image through the Unraid template.
+1. deploy the image containing the native-backup exclusion;
+2. run `/backup world` against the actual server;
+3. verify the RCON `Save` request and the timestamped snapshot under
+   `/data/backups/world`;
+4. verify that the Palworld source `SaveGames` directory remains unchanged;
+5. then consider diff, rollback, and restart reporting as future work.

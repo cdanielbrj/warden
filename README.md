@@ -65,8 +65,28 @@ The Palworld Realm currently provides these admin-only slash commands. Responses
 | `/players` | Lists connected player names only. |
 | `/save` | Saves the world data. |
 | `/shutdown` | Schedules a shutdown after an explicit button confirmation. |
+| `/config show` | Shows the parsed `OptionSettings` configuration. |
+| `/config get key` | Shows one configuration value. |
+| `/config set key value` | Validates and atomically updates one supported setting after creating a configuration backup. |
+| `/backup config` | Creates a timestamped copy of `PalWorldSettings.ini`. |
+| `/backup world` | Requests an RCON save and creates a timestamped snapshot of active world data. |
 
 `/shutdown` requires a countdown between 10 and 3,600 seconds plus a player-facing message. The game container's restart policy is responsible for bringing the server back after shutdown.
+
+`/config get` and `/config set` offer key autocomplete. `/config set` preserves unknown settings, writes through a temporary file followed by an atomic rename, and does not restart the server itself; use `/shutdown` when the changed setting requires a restart.
+
+World snapshots deliberately exclude Palworld's own rotating `backup` directories from the copy. The source game files are never deleted or modified by this command.
+
+## Unraid mounts for Palworld
+
+The container template must map the Target-specific directories to Warden's fixed container paths with read/write access:
+
+| Host path | Container path | Purpose |
+| --- | --- | --- |
+| `/mnt/user/games/<target>/serverfiles` | `/data/serverfiles` | Reads and updates `PalWorldSettings.ini`; reads active world data. |
+| `/mnt/user/games/backups/<target>` | `/data/backups` | Stores Warden-managed configuration and world backups. |
+
+Host paths stay in the Unraid template; application code only uses the stable `/data/...` paths.
 
 ## CI
 

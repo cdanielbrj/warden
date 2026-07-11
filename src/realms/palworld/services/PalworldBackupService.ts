@@ -40,6 +40,7 @@ export class PalworldBackupService {
       await cp(palworldPaths.saveGamesDirectory, backupPath, {
         recursive: true,
         errorOnExist: true,
+        filter: (source) => basename(source) !== "backup",
         force: false,
         preserveTimestamps: true,
       });
