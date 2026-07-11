@@ -181,6 +181,7 @@ The shared image is configured per Guardian through environment variables. Core 
 - `REALM`
 - `DISCORD_TOKEN`
 - `DISCORD_CLIENT_ID`
+- `DISCORD_ADMIN_USER_IDS`
 
 Each Realm owns the validation of its game-specific needs. Realms that connect through RCON, including the current Palworld Realm, require:
 
@@ -296,6 +297,7 @@ REALM=palworld
 
 DISCORD_TOKEN=
 DISCORD_CLIENT_ID=
+DISCORD_ADMIN_USER_IDS=
 
 RCON_HOST=
 RCON_PORT=
@@ -308,13 +310,14 @@ Definitions:
 - `REALM`: Realm loaded by this container.
 - `DISCORD_TOKEN`: bot token from the Discord Developer Portal.
 - `DISCORD_CLIENT_ID`: Discord Application ID.
+- `DISCORD_ADMIN_USER_IDS`: comma-separated Discord user IDs authorized to administer the Guardian.
 - `RCON_HOST`, `RCON_PORT`, and `RCON_PASSWORD`: generic RCON connection settings. They are required and validated only by a Realm that uses RCON.
 
 The Discord Public Key is not required for the gateway-based `discord.js` client used by this project.
 
-The RCON settings are present in the template before the RCON client is implemented, so a deployment has one stable configuration format. A Realm that does not use RCON ignores them.
+The RCON settings are part of the stable container configuration format. A Realm that does not use RCON ignores them.
 
-During the initial Palworld phase, Warden authenticates against the configured RCON target and executes the safe `Info` query during startup. Additional game commands are introduced separately after this deployment-level check succeeds.
+During startup, the Palworld Realm authenticates against the configured RCON target and executes the safe `Info` query. The implemented Discord commands reuse the same Realm-owned RCON service.
 
 Secrets must never be committed.
 
@@ -329,25 +332,23 @@ Expected startup sequence:
 ```text
 1. Start Warden
 2. Read and validate environment variables
-3. Initialize logger
-4. Load the configured Realm
-5. Create Discord client
-6. Register development slash commands
-7. Connect to Discord
-8. Begin listening for interactions
-9. Report readiness
+3. Load and initialize the configured Realm
+4. Register the Realm's global Discord commands
+5. Create the Discord client
+6. Connect to Discord
+7. Begin listening for interactions
+8. Report readiness
 ```
 
 Expected startup logs:
 
 ```text
-[INFO] Starting Warden v0.0.1
-[INFO] Guardian: Lady Astra
-[INFO] Loading Realm: palworld
-[SUCCESS] Realm loaded: Palworld
-[INFO] Connecting to Discord
-[SUCCESS] Logged in as Lady Astra#4463
-[SUCCESS] Warden is ready
+[INFO] Starting Warden...
+[INFO] Authenticating RCON connection to <host>:<port>.
+[SUCCESS] RCON authentication succeeded for <host>:<port>.
+[SUCCESS] Registered 4 global Discord command(s).
+[SUCCESS] Logged as Lady Astra#4463
+[SUCCESS] Lady Astra is watching Palworld.
 ```
 
 A missing required environment variable must:
@@ -372,9 +373,7 @@ Suggested initial shape:
 import type { GuardianCommand } from "./Command.js";
 
 export interface Realm {
-  readonly id: string;
   readonly name: string;
-  readonly version: string;
   readonly commands: readonly GuardianCommand[];
 
   initialize(): Promise<void>;
@@ -393,10 +392,11 @@ Suggested shape when slash-command registration begins:
 import type {
   ChatInputCommandInteraction,
   SlashCommandBuilder,
+  SlashCommandOptionsOnlyBuilder,
 } from "discord.js";
 
 export interface GuardianCommand {
-  readonly data: SlashCommandBuilder;
+  readonly data: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder;
 
   execute(interaction: ChatInputCommandInteraction): Promise<void>;
 }
@@ -469,31 +469,18 @@ The Realm owns:
 - game-specific execution;
 - game-specific response content.
 
-For development, commands should be registered to `DISCORD_GUILD_ID`, not globally. Global registration may be introduced only when a production release needs it.
+Commands are registered globally for the Guardian's Discord Application. A Guardian remains restricted by its own token and its `DISCORD_ADMIN_USER_IDS` allowlist.
 
-### Initial command
+### Implemented Palworld commands
 
-The first command should be `/about`.
+The first MVP exposes four global slash commands, all restricted to `DISCORD_ADMIN_USER_IDS`:
 
-Purpose:
+- `/status`: show server information through RCON `Info`;
+- `/players`: show connected player names through RCON `ShowPlayers`;
+- `/save`: save world data through RCON `Save`;
+- `/shutdown`: schedule a graceful shutdown through RCON `Shutdown` after an explicit Discord button confirmation.
 
-- prove the Realm loaded;
-- prove command registration works;
-- prove interaction routing works;
-- expose Warden, Guardian, Realm, and version information.
-
-Suggested response:
-
-```text
-Lady Astra
-
-Framework: Warden
-Version: 0.0.1
-Realm: Palworld
-Status: Online
-```
-
-No RCON connection is required for `/about`.
+All command responses are ephemeral. `/shutdown` requires a countdown between 10 and 3,600 seconds and a player-facing message.
 
 ---
 
@@ -503,14 +490,12 @@ Permissions are part of the Realm because different games may expose different a
 
 However, Discord identity and role retrieval are infrastructure provided by the Core.
 
-The first foundation phase does not implement permissions.
+The first administrative phase implements a Guardian-level allowlist through `DISCORD_ADMIN_USER_IDS`. It denies access by default; richer command- and role-based permissions may be introduced later.
 
 Future Palworld permissions should be command-oriented, for example:
 
 ```text
-palworld.about
 palworld.players.read
-palworld.broadcast
 palworld.save
 palworld.shutdown
 palworld.kick
@@ -662,7 +647,7 @@ This permits live reload without installing Node on the host.
 
 ### Production image
 
-The production image should eventually use a multi-stage build:
+The published image uses a multi-stage build:
 
 ```text
 builder
@@ -676,7 +661,7 @@ runtime
   └── run node dist/index.js
 ```
 
-Production must not use `tsx watch`.
+The production runtime does not include TypeScript, `tsx`, or source files and does not use `tsx watch`. The Compose configuration explicitly selects the `development` target for local live reload.
 
 Production configuration must come from environment variables or mounted configuration, not be baked into the image.
 
@@ -686,9 +671,9 @@ Production configuration must come from environment variables or mounted configu
 
 Already validated:
 
-- Docker Compose builds successfully.
-- The container runs Node.js 22 Alpine.
-- TypeScript runs through `tsx watch`.
+- Docker Compose builds the `development` target successfully.
+- The published runtime uses Node.js 22 Alpine, compiled JavaScript, and production dependencies only.
+- TypeScript runs through `tsx watch` only in the Compose development target.
 - `.env` is loaded into the container.
 - `discord.js` version is 14.26.5.
 - Lady Astra authenticates successfully.
@@ -708,7 +693,7 @@ Current successful output is conceptually:
 
 ## 18. Phase plan
 
-### Phase 1 — Foundation
+### Phase 1 — Foundation — Complete
 
 Scope:
 
@@ -718,62 +703,58 @@ Scope:
 - graceful startup failure;
 - Realm contract;
 - explicit Realm loader;
-- empty Palworld Realm;
-- guild slash-command registration;
-- `/about`;
+- Palworld Realm;
+- global slash-command registration;
 - interaction routing;
-- clean shutdown handling.
+- generic interaction error handling.
 
 Acceptance criteria:
 
 1. `docker compose up --build` starts Warden.
 2. Warden loads only the `palworld` Realm.
 3. Lady Astra connects to Discord.
-4. `/about` appears in the development guild.
-5. `/about` returns the expected framework and Realm information.
+4. Realm commands are registered globally for the Guardian Application.
+5. Interactions route to the selected Realm.
 6. Missing required configuration stops the container with a useful error.
 7. The project type-checks successfully inside Docker.
-8. No RCON code exists yet.
 
-### Phase 2 — Palworld connectivity
+### Phase 2 — Palworld connectivity — Complete
 
 Scope:
 
-- choose and integrate a Palworld-compatible RCON client;
+- integrate a Palworld-compatible RCON client;
 - validate RCON environment variables;
-- implement connection timeout;
-- implement a connection test service;
+- implement connection and response timeouts;
 - distinguish authentication and network failures;
-- expose a safe diagnostic command, likely `/status` or `/connection`.
+- expose `/status`.
 
 Acceptance criteria:
 
-- Lady Astra connects to the correct local RCON endpoint;
+- Lady Astra connects and authenticates against the correct local RCON endpoint;
 - no RCON port is exposed publicly;
 - failure responses do not leak the password;
-- connection behavior is observable through logs.
+- `Info`, `ShowPlayers`, `Save`, and `Shutdown` are validated against the actual Palworld server.
 
-### Phase 3 — Administrative commands
+### Phase 3 — Administrative commands — Complete for MVP
 
 Initial candidates:
 
+- status;
 - players;
-- broadcast;
 - save;
 - shutdown.
 
 Commands must be tested against the actual Palworld server behavior before being generalized.
 
-### Phase 4 — Permissions and audit
+### Phase 4 — Permissions and audit — Partially complete
 
 Scope:
 
-- Discord role and user-ID rules;
+- Discord user-ID allowlist;
 - deny-by-default authorization;
-- per-command permission metadata;
 - ephemeral denial responses;
 - confirmation for critical actions;
-- administrative audit logs.
+- administrative audit logs (future).
 
 ### Phase 5 — Production delivery
 
@@ -925,23 +906,11 @@ When modifying this repository:
 
 ---
 
-## 24. Immediate next task
+## 24. Next task
 
-Implement the remainder of **Phase 1 — Foundation** from the current working Discord connection.
+The `0.1.0` MVP now has a production runtime image. The next delivery phase is release and operational hardening:
 
-Recommended sequence:
-
-1. improve environment typing and validation;
-2. add process-level error handlers;
-3. define the `Realm` contract;
-4. create the explicit `RealmLoader`;
-5. create the minimal Palworld Realm;
-6. load the configured Realm before Discord login;
-7. define the command contract;
-8. implement `/about` inside the Palworld Realm;
-9. register commands to the development guild;
-10. route interactions to Realm commands;
-11. add graceful shutdown for `SIGINT` and `SIGTERM`;
-12. validate with Docker Compose and TypeScript build.
-
-Do not add RCON during this task.
+1. add a container health check appropriate to the Guardian lifecycle;
+2. commit and tag a versioned release;
+3. publish a versioned GHCR image;
+4. deploy the versioned image through the Unraid template.

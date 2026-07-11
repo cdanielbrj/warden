@@ -21,9 +21,23 @@ export function requiredPort(name: string): number {
    return port;
 }
 
+function requiredList(name: string): readonly string[] {
+   const values = required(name)
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+   if (values.length === 0) {
+      throw new Error(`Missing environment variable: ${name}`);
+   }
+
+   return values;
+}
+
 export const env = {
    guardianName: required("GUARDIAN_NAME"),
    realm: required("REALM"),
    discordToken: required("DISCORD_TOKEN"),
    discordClientId: required("DISCORD_CLIENT_ID"),
+   discordAdminUserIds: requiredList("DISCORD_ADMIN_USER_IDS"),
 };

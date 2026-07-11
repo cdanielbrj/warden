@@ -16,14 +16,17 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: docker build --tag warden:ci --file docker/Dockerfile .
+      - name: Build development image
+        run: docker build --target development --tag warden:ci-check --file docker/Dockerfile .
 
       - name: Audit dependencies inside Docker
-        run: docker run --rm warden:ci npm audit --audit-level=low
+        run: docker run --rm warden:ci-check npm audit --audit-level=low
 
       - name: Compile TypeScript inside Docker
-        run: docker run --rm warden:ci npm run build
+        run: docker run --rm warden:ci-check npm run build
+
+      - name: Build production image
+        run: docker build --tag warden:ci --file docker/Dockerfile .
 
   publish:
     needs: build
