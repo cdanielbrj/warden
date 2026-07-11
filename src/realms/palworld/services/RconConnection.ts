@@ -82,10 +82,10 @@ export class RconClient {
     const requestId = this.getRequestId();
     this.writePacket(requestId, RconPacketType.Auth, password);
 
+    // Palworld does not reliably mirror Source RCON request IDs in responses.
     const response = await this.waitForPacket(
       (packet) =>
-        packet.type === RconPacketType.AuthResponse &&
-        (packet.id === requestId || packet.id === -1),
+        packet.type === RconPacketType.AuthResponse,
     );
 
     if (response.id === -1) {
@@ -98,8 +98,7 @@ export class RconClient {
     this.writePacket(requestId, RconPacketType.ExecuteCommand, command);
 
     const response = await this.waitForPacket(
-      (packet) =>
-        packet.id === requestId && packet.type === RconPacketType.ResponseValue,
+      (packet) => packet.type === RconPacketType.ResponseValue,
     );
 
     return response.body;
