@@ -54,7 +54,7 @@ Docker is the only supported development and runtime environment.
 docker compose up --build
 ```
 
-The current bootstrap validates configuration, loads the selected Realm, and connects the Guardian to Discord. RCON commands and Discord command handling are the next implementation phase.
+The current bootstrap validates configuration, verifies TCP reachability to the configured RCON target, loads the selected Realm, and connects the Guardian to Discord. RCON authentication, commands, and Discord command handling are the next implementation phase.
 
 ## CI
 

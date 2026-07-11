@@ -312,6 +312,8 @@ The Discord Public Key is not required for the gateway-based `discord.js` client
 
 The RCON settings are present in the template before the RCON client is implemented, so a deployment has one stable configuration format. A Realm that does not use RCON ignores them.
 
+During the initial Palworld phase, Warden verifies TCP reachability to the configured RCON target during startup. RCON authentication and game commands are introduced separately after this deployment-level connectivity check succeeds.
+
 Secrets must never be committed.
 
 The real `.env` must be ignored by Git. `.env.example` must contain names only, never real values.
