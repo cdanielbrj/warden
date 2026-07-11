@@ -58,7 +58,12 @@ The current bootstrap validates configuration, loads the selected Realm, and con
 
 ## CI
 
-GitHub Actions builds the Docker image and compiles TypeScript inside it on pushes to `main` and pull requests.
+GitHub Actions builds the Docker image, audits its dependencies, and compiles TypeScript inside it on pushes to `main` and pull requests. After a successful push to `main`, it also publishes the image to GitHub Container Registry:
+
+```text
+ghcr.io/<owner>/warden:latest
+ghcr.io/<owner>/warden:<commit-sha>
+```
 
 ## Documentation
 
