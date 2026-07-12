@@ -7,14 +7,16 @@ import {
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
 } from "discord.js";
+import { completeCommand, formatResponse } from "../../../core/bot/Response.js";
 import type { GuardianCommand } from "../../../core/types/Command.js";
 import { requireAdmin } from "../permissions/Admin.js";
 import { PalworldRconService } from "../services/PalworldRconService.js";
-import { formatResponse } from "./Response.js";
 
 export function createShutdownCommand(
   service: PalworldRconService,
 ): GuardianCommand {
+  const resultVisibility = () => "public" as const;
+
   return {
     data: new SlashCommandBuilder()
       .setName("shutdown")
@@ -36,6 +38,8 @@ export function createShutdownCommand(
           .setMinLength(1)
           .setMaxLength(200),
       ),
+
+    resultVisibility,
 
     async execute(interaction: ChatInputCommandInteraction) {
       if (!(await requireAdmin(interaction))) {
@@ -94,7 +98,11 @@ export function createShutdownCommand(
         components: [],
       });
       const response = await service.shutdown(seconds, message);
-      await interaction.editReply(formatResponse(response, "Shutdown accepted."));
+      await completeCommand(
+        interaction,
+        resultVisibility,
+        formatResponse(response, "Shutdown accepted."),
+      );
     },
   };
 }

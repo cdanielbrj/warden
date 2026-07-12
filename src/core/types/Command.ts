@@ -11,8 +11,14 @@ type CommandBuilder =
   | SlashCommandOptionsOnlyBuilder
   | SlashCommandSubcommandsOnlyBuilder;
 
+export type CommandResultVisibility = "private" | "public";
+export type CommandResultVisibilityResolver = (
+  interaction: ChatInputCommandInteraction,
+) => CommandResultVisibility;
+
 export interface GuardianCommand {
   readonly data: CommandBuilder;
+  readonly resultVisibility: CommandResultVisibilityResolver;
   execute(interaction: ChatInputCommandInteraction): Promise<void>;
   autocomplete?(interaction: AutocompleteInteraction): Promise<void>;
 }

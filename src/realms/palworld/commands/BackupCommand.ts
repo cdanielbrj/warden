@@ -1,4 +1,8 @@
-import { MessageFlags, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
+import {
+  completeCommand,
+  deferPrivateResponse,
+} from "../../../core/bot/Response.js";
 import type { GuardianCommand } from "../../../core/types/Command.js";
 import { requireAdmin } from "../permissions/Admin.js";
 import { PalworldBackupService } from "../services/PalworldBackupService.js";
@@ -6,6 +10,8 @@ import { PalworldBackupService } from "../services/PalworldBackupService.js";
 export function createBackupCommand(
   service: PalworldBackupService,
 ): GuardianCommand {
+  const resultVisibility = () => "public" as const;
+
   return {
     data: new SlashCommandBuilder()
       .setName("backup")
@@ -22,19 +28,25 @@ export function createBackupCommand(
           .setDescription("Save and back up all Palworld world data"),
       ),
 
+    resultVisibility,
+
     async execute(interaction) {
       if (!(await requireAdmin(interaction))) {
         return;
       }
 
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      await deferPrivateResponse(interaction);
       const subcommand = interaction.options.getSubcommand();
       const backup =
         subcommand === "config"
           ? await service.config()
           : await service.world();
 
-      await interaction.editReply(`Backup created: ${backup.path}`);
+      await completeCommand(
+        interaction,
+        resultVisibility,
+        `Backup created: ${backup.path}`,
+      );
     },
   };
 }

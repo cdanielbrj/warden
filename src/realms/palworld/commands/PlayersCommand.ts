@@ -1,8 +1,12 @@
-import { MessageFlags, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
+import {
+  completeCommand,
+  deferPrivateResponse,
+  formatResponse,
+} from "../../../core/bot/Response.js";
 import type { GuardianCommand } from "../../../core/types/Command.js";
 import { requireAdmin } from "../permissions/Admin.js";
 import { PalworldRconService } from "../services/PalworldRconService.js";
-import { formatResponse } from "./Response.js";
 
 function parseCsvRow(row: string): string[] {
   const values: string[] = [];
@@ -64,27 +68,39 @@ function getPlayerNames(response: string): string[] {
 export function createPlayersCommand(
   service: PalworldRconService,
 ): GuardianCommand {
+  const resultVisibility = () => "private" as const;
+
   return {
     data: new SlashCommandBuilder()
       .setName("players")
       .setDescription("List connected Palworld players")
       .setDMPermission(false),
 
+    resultVisibility,
+
     async execute(interaction) {
       if (!(await requireAdmin(interaction))) {
         return;
       }
 
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      await deferPrivateResponse(interaction);
       const response = await service.players();
       const players = getPlayerNames(response);
 
       if (players.length === 0) {
-        await interaction.editReply("No players are connected.");
+        await completeCommand(
+          interaction,
+          resultVisibility,
+          "No players are connected.",
+        );
         return;
       }
 
-      await interaction.editReply(formatResponse(players.join("\n"), ""));
+      await completeCommand(
+        interaction,
+        resultVisibility,
+        formatResponse(players.join("\n"), ""),
+      );
     },
   };
 }

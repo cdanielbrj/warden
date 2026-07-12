@@ -2,7 +2,12 @@ import {
   MessageFlags,
   SlashCommandBuilder,
   type AutocompleteInteraction,
+  type ChatInputCommandInteraction,
 } from "discord.js";
+import {
+  completeCommand,
+  deferPrivateResponse,
+} from "../../../core/bot/Response.js";
 import type { GuardianCommand } from "../../../core/types/Command.js";
 import type { PalworldSetting } from "../config/PalworldSettingsParser.js";
 import {
@@ -60,12 +65,14 @@ export function createConfigCommand(
           ),
       ),
 
+    resultVisibility: getConfigResultVisibility,
+
     async execute(interaction) {
       if (!(await requireAdmin(interaction))) {
         return;
       }
 
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      await deferPrivateResponse(interaction);
       const subcommand = interaction.options.getSubcommand();
 
       if (subcommand === "set") {
@@ -73,7 +80,9 @@ export function createConfigCommand(
         const value = interaction.options.getString("value", true);
         const update = await service.update(key, value);
 
-        await interaction.editReply(
+        await completeCommand(
+          interaction,
+          getConfigResultVisibility,
           `${formatSetting({ key, rawValue: update.value })}\nBackup created: ${update.backupPath}\nRestart the server with /shutdown to apply this setting.`,
         );
         return;
@@ -85,7 +94,9 @@ export function createConfigCommand(
         const key = interaction.options.getString("key", true);
         const value = document.get(key);
 
-        await interaction.editReply(
+        await completeCommand(
+          interaction,
+          getConfigResultVisibility,
           value === undefined
             ? `Setting "${key}" was not found.`
             : formatSetting({ key, rawValue: value }),
@@ -100,6 +111,12 @@ export function createConfigCommand(
       await respondToConfigAutocomplete(interaction);
     },
   };
+}
+
+function getConfigResultVisibility(
+  interaction: ChatInputCommandInteraction,
+): "private" | "public" {
+  return interaction.options.getSubcommand() === "set" ? "public" : "private";
 }
 
 async function respondToConfigAutocomplete(
@@ -148,7 +165,7 @@ async function respondWithSettings(
   const responses = splitSettings(settings);
   const [firstResponse, ...remainingResponses] = responses;
 
-  await interaction.editReply(firstResponse);
+  await completeCommand(interaction, getConfigResultVisibility, firstResponse);
 
   for (const response of remainingResponses) {
     await interaction.followUp({
