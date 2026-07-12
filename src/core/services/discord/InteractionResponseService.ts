@@ -2,7 +2,7 @@ import {
   MessageFlags,
   type ChatInputCommandInteraction,
 } from "discord.js";
-import type { CommandResultVisibilityResolver } from "../types/Command.js";
+import type { CommandResultVisibilityResolver } from "../../types/Command.js";
 
 export async function deferPrivateResponse(
   interaction: ChatInputCommandInteraction,

@@ -1,70 +1,48 @@
-import { cp, mkdir, stat } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename } from "node:path";
+import {
+  BackupStorageService,
+  type StoredBackup,
+} from "../../../core/services/storage/BackupStorageService.js";
 import { palworldPaths } from "../config/Paths.js";
 import { PalworldRconService } from "./PalworldRconService.js";
 
-export interface PalworldBackup {
-  readonly path: string;
-}
-
 export class PalworldBackupService {
-  constructor(private readonly rcon: PalworldRconService) {}
+  constructor(
+    private readonly rcon: PalworldRconService,
+    private readonly storage: BackupStorageService,
+  ) {}
 
-  async config(): Promise<PalworldBackup> {
-    const backupDirectory = await this.createBackupDirectory("config");
+  async config(): Promise<StoredBackup> {
     const backupName = `${basename(palworldPaths.settingsFile, ".ini")}.${timestamp()}.ini`;
-    const backupPath = join(backupDirectory, backupName);
 
     try {
-      await cp(palworldPaths.settingsFile, backupPath, {
-        errorOnExist: true,
-        force: false,
-        preserveTimestamps: true,
+      return await this.storage.copy({
+        category: "config",
+        name: backupName,
+        sourcePath: palworldPaths.settingsFile,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       throw new Error(`Unable to create Palworld configuration backup: ${message}`);
     }
-
-    return { path: `config/${backupName}` };
   }
 
-  async world(): Promise<PalworldBackup> {
-    const backupDirectory = await this.createBackupDirectory("world");
+  async world(): Promise<StoredBackup> {
     const backupName = timestamp();
-    const backupPath = join(backupDirectory, backupName);
 
     await this.rcon.save();
 
     try {
-      await cp(palworldPaths.saveGamesDirectory, backupPath, {
+      return await this.storage.copy({
+        category: "world",
+        name: backupName,
         recursive: true,
-        errorOnExist: true,
+        sourcePath: palworldPaths.saveGamesDirectory,
         filter: (source) => basename(source) !== "backup",
-        force: false,
-        preserveTimestamps: true,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       throw new Error(`Unable to create Palworld world backup: ${message}`);
-    }
-
-    return { path: `world/${backupName}` };
-  }
-
-  private async createBackupDirectory(kind: "config" | "world"): Promise<string> {
-    try {
-      const backupRoot = await stat(palworldPaths.backupDirectory);
-      if (!backupRoot.isDirectory()) {
-        throw new Error("Backup root is not a directory.");
-      }
-
-      const backupDirectory = join(palworldPaths.backupDirectory, kind);
-      await mkdir(backupDirectory, { recursive: true });
-      return backupDirectory;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      throw new Error(`Unable to access Palworld backup directory: ${message}`);
     }
   }
 }

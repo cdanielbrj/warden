@@ -2,7 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 import {
   completeCommand,
   deferPrivateResponse,
-} from "../../../core/bot/Response.js";
+} from "../../../core/services/discord/InteractionResponseService.js";
 import type { GuardianCommand } from "../../../core/types/Command.js";
 import { requireAdmin } from "../permissions/Admin.js";
 import { PalworldBackupService } from "../services/PalworldBackupService.js";

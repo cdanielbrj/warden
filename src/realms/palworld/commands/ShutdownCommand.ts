@@ -7,7 +7,10 @@ import {
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
 } from "discord.js";
-import { completeCommand, formatResponse } from "../../../core/bot/Response.js";
+import {
+  completeCommand,
+  formatResponse,
+} from "../../../core/services/discord/InteractionResponseService.js";
 import type { GuardianCommand } from "../../../core/types/Command.js";
 import { requireAdmin } from "../permissions/Admin.js";
 import { PalworldRconService } from "../services/PalworldRconService.js";

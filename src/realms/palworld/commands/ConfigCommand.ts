@@ -7,7 +7,7 @@ import {
 import {
   completeCommand,
   deferPrivateResponse,
-} from "../../../core/bot/Response.js";
+} from "../../../core/services/discord/InteractionResponseService.js";
 import type { GuardianCommand } from "../../../core/types/Command.js";
 import type { PalworldSetting } from "../config/PalworldSettingsParser.js";
 import {

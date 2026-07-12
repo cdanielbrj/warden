@@ -1,7 +1,9 @@
 import { Logger } from "../../core/logger/Logger.js";
+import { BackupStorageService } from "../../core/services/storage/BackupStorageService.js";
 import type { Realm } from "../../core/types/Realm.js";
 import { createPalworldCommands } from "./commands/index.js";
 import { palworldEnv } from "./config/env.js";
+import { palworldPaths } from "./config/Paths.js";
 import { RconClient } from "./services/RconConnection.js";
 import { PalworldRconService } from "./services/PalworldRconService.js";
 import { PalworldBackupService } from "./services/PalworldBackupService.js";
@@ -9,7 +11,8 @@ import { PalworldSettingsService } from "./services/PalworldSettingsService.js";
 
 export function createRealm(): Realm {
   const rcon = new PalworldRconService();
-  const backups = new PalworldBackupService(rcon);
+  const backupStorage = new BackupStorageService(palworldPaths.backupDirectory);
+  const backups = new PalworldBackupService(rcon, backupStorage);
   const settings = new PalworldSettingsService(backups);
 
   return {
