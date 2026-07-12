@@ -20,10 +20,12 @@ export async function completeCommand(
     return;
   }
 
-  await interaction.followUp({ content });
-  await interaction.editReply(
-    "Command completed. The result was posted in this channel.",
-  );
+  if (!interaction.channel?.isSendable()) {
+    throw new Error("Unable to publish command result: interaction channel is unavailable.");
+  }
+
+  await interaction.channel.send({ content });
+  await interaction.deleteReply();
 }
 
 export function formatResponse(response: string, fallback: string): string {
