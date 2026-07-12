@@ -29,7 +29,7 @@ export class BackupStorageService {
         filter: request.filter,
         force: false,
         preserveTimestamps: true,
-        recursive: request.recursive,
+        recursive: request.recursive ?? false,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
