@@ -2,6 +2,8 @@
 
 Warden is a Docker-first framework for administering dedicated game servers through Discord.
 
+Current release: **0.2.0**.
+
 ## Operating model
 
 One Guardian controls exactly one game-server instance:
@@ -57,25 +59,27 @@ The current MVP authenticates with the configured RCON target, executes a safe s
 
 ## Palworld commands
 
-The Palworld Realm currently provides these admin-only slash commands. Responses are ephemeral.
+The Palworld Realm currently provides these admin-only slash commands. Queries,
+errors, and confirmations are private; successful actions that change server state
+are published in the channel where the command was used.
 
-| Command | Behavior |
-| --- | --- |
-| `/status` | Shows server information. |
-| `/players` | Lists connected player names only. |
-| `/save` | Saves the world data. |
-| `/shutdown` | Schedules a shutdown after an explicit button confirmation. |
-| `/config show` | Shows the parsed `OptionSettings` configuration. |
-| `/config get key` | Shows one configuration value. |
-| `/config set key value` | Validates and atomically updates one supported setting after creating a configuration backup. |
-| `/backup config` | Creates a timestamped copy of `PalWorldSettings.ini`. |
-| `/backup world` | Requests an RCON save and creates a timestamped snapshot of active world data. |
+| Command | Behavior | Result |
+| --- | --- | --- |
+| `/status` | Shows server information. | Private |
+| `/players` | Lists connected player names only. | Private |
+| `/save` | Saves the world data. | Public on success |
+| `/shutdown` | Schedules a shutdown after an explicit button confirmation. | Public on success |
+| `/config show` | Shows the parsed `OptionSettings` configuration. | Private |
+| `/config get key` | Shows one configuration value. | Private |
+| `/config set key value` | Validates and atomically updates one supported setting after creating a configuration backup. | Public on success |
+| `/backup config` | Creates a timestamped copy of `PalWorldSettings.ini`. | Public on success |
+| `/backup world` | Requests an RCON save and creates a timestamped snapshot of active world data. | Public on success |
 
 `/shutdown` requires a countdown between 10 and 3,600 seconds plus a player-facing message. The game container's restart policy is responsible for bringing the server back after shutdown.
 
 `/config get` and `/config set` offer key autocomplete. `/config set` preserves unknown settings, writes through a temporary file followed by an atomic rename, and does not restart the server itself; use `/shutdown` when the changed setting requires a restart.
 
-World snapshots deliberately exclude Palworld's own rotating `backup` directories from the copy. The source game files are never deleted or modified by this command.
+World snapshots deliberately exclude Palworld's own rotating `backup` directories from the copy. The source game files are never deleted or modified by this command. Configuration and world backups are validated on Lady Iris.
 
 ## Unraid mounts for Palworld
 

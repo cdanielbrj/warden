@@ -1,9 +1,9 @@
 # Warden — Architecture and Implementation Guide
 
 **Status:** Accepted baseline  
-**Software version:** 0.1.0
+**Software version:** 0.2.0
 **Architecture baseline:** 0.2
-**Document revision:** 2026-07-11
+**Document revision:** 2026-07-12
 **Initial Guardian:** Lady Astra  
 **Initial Realm:** Palworld  
 **Runtime:** Docker only  
@@ -246,7 +246,7 @@ docker compose exec warden npm run build
 
 ### Runtime configuration
 
-The shared image is configured per Guardian through environment variables. Current `0.1.0` Core configuration is common to every Realm:
+The shared image is configured per Guardian through environment variables. Current `0.2.0` Core configuration is common to every Realm:
 
 - `GUARDIAN_NAME`
 - `REALM`
@@ -266,7 +266,7 @@ The accepted identity model for a future migration is:
 - `TARGET_ID`: stable deployment identifier such as `palworld`, `palworld2`, or `valheim`;
 - `REALM`: game implementation loaded by the Guardian.
 
-`GUARDIAN_NAME` remains the current implemented field in `0.1.0`. It should eventually become a display name derived from `GUARDIAN_ID`, rather than unrestricted identity input.
+`GUARDIAN_NAME` remains the current implemented field in `0.2.0`. It should eventually become a display name derived from `GUARDIAN_ID`, rather than unrestricted identity input.
 
 The root `.env.example` is the single configuration template for a Warden container. It contains shared settings and the connection capabilities currently used by the project. A Realm ignores values it does not use and validates the values it requires.
 
@@ -624,6 +624,8 @@ The Core owns:
 - interaction-event handling;
 - command lookup;
 - generic error handling.
+- private/public response delivery;
+- reusable mounted-filesystem backup storage.
 
 The Realm owns:
 
@@ -647,7 +649,7 @@ The current Palworld Realm exposes six global slash commands, all restricted to 
 - `/config`: show the parsed settings, get a setting, or set a catalogued setting;
 - `/backup`: create a configuration backup or a world snapshot.
 
-All command responses are ephemeral. `/shutdown` requires a countdown between 10 and 3,600 seconds and a player-facing message. `/config get` and `/config set` offer Discord autocomplete from the Realm's settings catalogue; value autocomplete is available for boolean and enumerated settings.
+Queries, errors, authorization denials, and critical confirmations are private. Successful actions that change server state are posted publicly in the channel where the command was invoked. `/shutdown` requires a countdown between 10 and 3,600 seconds and a player-facing message. `/config get` and `/config set` offer Discord autocomplete from the Realm's settings catalogue; value autocomplete is available for boolean and enumerated settings.
 
 `/config set` validates the key and value, calls the same configuration-backup service as `/backup config`, writes a temporary file, and atomically renames it into place. It never restarts the server implicitly; an administrator uses `/shutdown` to apply restart-dependent changes. `/backup world` calls RCON `Save` before copying active `SaveGames` data into Warden's backup mount. Palworld's native rotating directories named `backup` are excluded from that copy only; the game source is never modified or deleted.
 
@@ -858,6 +860,11 @@ Already validated:
 - Lady Iris validated `/config show`, `/config get`, autocomplete, sequential
   `/config set` updates, configuration backups, and restart persistence against
   the real Palworld server.
+- Lady Iris validated `/backup config` and `/backup world`; world snapshots
+  exclude only Palworld's native rotating `backup` directories and leave the
+  source save data intact.
+- Successful state-changing commands publish their outcome in the invoking
+  Discord channel, while queries, errors, and confirmations remain private.
 
 Current successful output is conceptually:
 
@@ -948,7 +955,7 @@ Scope:
 - health checks;
 - versioned releases.
 
-### Phase 6 — Palworld configuration management — Operational validation
+### Phase 6 — Palworld configuration management — Complete
 
 Scope:
 
@@ -962,9 +969,10 @@ Completed delivery sequence:
 1. validate `/config show` and `/config get` against Lady Iris's actual file;
 2. add catalogue-backed edits and autocomplete;
 3. add shared configuration backup creation and atomic replacement;
-4. validate sequential edits and restart persistence on Lady Iris.
+4. validate sequential edits and restart persistence on Lady Iris;
+5. validate configuration and world backups on Lady Iris.
 
-The remaining operational check is `/backup world` after excluding the unstable native Palworld `backup` history from the Warden snapshot. Future work can add a diff, rollback, and restart reporting.
+Future work can add a configuration diff, rollback, and restart reporting.
 
 ### Future — Lady Warden supervisor
 
@@ -1136,11 +1144,12 @@ When modifying this repository:
 
 ## 24. Next task
 
-Validate the world-backup correction on Lady Iris:
+Discover the Valheim Realm control surface:
 
-1. deploy the image containing the native-backup exclusion;
-2. run `/backup world` against the actual server;
-3. verify the RCON `Save` request and the timestamped snapshot under
-   `/data/backups/world`;
-4. verify that the Palworld source `SaveGames` directory remains unchanged;
-5. then consider diff, rollback, and restart reporting as future work.
+1. inspect the existing Valheim container for supported remote administration
+   and native backup capabilities;
+2. identify the mounted world-data path and determine whether a live copy is a
+   consistent recovery point;
+3. define the smallest safe Valheim Realm command set;
+4. reuse Core backup storage only after its source and consistency model are
+   verified.
