@@ -1,4 +1,5 @@
 import {
+  EmbedBuilder,
   MessageFlags,
   type ChatInputCommandInteraction,
 } from "discord.js";
@@ -25,6 +26,24 @@ export async function completeCommand(
   }
 
   await interaction.channel.send({ content });
+  await interaction.deleteReply();
+}
+
+export async function completeCommandEmbeds(
+  interaction: ChatInputCommandInteraction,
+  resultVisibility: CommandResultVisibilityResolver,
+  embeds: EmbedBuilder[],
+): Promise<void> {
+  if (resultVisibility(interaction) === "private") {
+    await interaction.editReply({ embeds });
+    return;
+  }
+
+  if (!interaction.channel?.isSendable()) {
+    throw new Error("Unable to publish command result: interaction channel is unavailable.");
+  }
+
+  await interaction.channel.send({ embeds });
   await interaction.deleteReply();
 }
 

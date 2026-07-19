@@ -19,6 +19,10 @@ export function createRealm(): Realm {
     name: "Palworld",
     commands: createPalworldCommands(rcon, settings, backups),
 
+    getStatus() {
+      return rcon.getStatus();
+    },
+
     async initialize() {
       const target = `${palworldEnv.rconHost}:${palworldEnv.rconPort}`;
 
