@@ -16,7 +16,7 @@ export type CommandResultVisibilityResolver = (
   interaction: ChatInputCommandInteraction,
 ) => CommandResultVisibility;
 
-export interface GuardianCommand {
+export interface WardenCommand {
   readonly data: CommandBuilder;
   readonly resultVisibility: CommandResultVisibilityResolver;
   execute(interaction: ChatInputCommandInteraction): Promise<void>;

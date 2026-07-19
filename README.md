@@ -2,28 +2,28 @@
 
 Warden is a Docker-first framework for administering dedicated game servers through Discord.
 
-Current release: **0.2.0**.
+Current release: **0.3.0**.
 
 ## Operating model
 
-One Guardian controls exactly one game-server instance:
+One Lady controls exactly one game-server instance; Lady Warden is the Master that aggregates them.
 
 ```text
 Lady Iris  -> Palworld 1
 Lady Astra -> Palworld 2
 ```
 
-Each Guardian has its own Discord Application, token, container, permissions, and target-server configuration. All Guardians use the same Warden source code and Docker image.
-
-`Lady Warden`, a future coordinator across Guardians, is explicitly outside the first phase.
+Each Lady has its own Discord Application, token, container, permissions, and instance configuration. All use the same Warden source code and Docker image.
 
 ## Architecture
 
-Warden keeps shared runtime concerns in the Core and all game-specific behavior in a Realm.
+Warden separates shared infrastructure, Ladies and the Master.
 
 ```text
-src/core/           Shared runtime: configuration, logging, Discord lifecycle, Realm loading
-src/realms/<realm>/ Game-specific configuration, services, commands, and permissions
+src/core/                 Shared contracts, Discord, logging and storage
+src/lady/realms/<realm>/  Game-specific configuration, services, commands and permissions
+src/lady/                 Lady API, status and Master registration
+src/warden/               Master registry, commands and Discord presentation
 ```
 
 The Core never administers a game directly. It loads the Realm selected by `REALM`; each Realm exports the same `createRealm()` contract.
@@ -33,8 +33,10 @@ The Core never administers a game directly. It loads the Realm selected by `REAL
 Each deployed container receives its own `.env` file. Start from `.env.example`:
 
 ```env
-GUARDIAN_NAME=Lady Astra
+ROLE=lady
+ID=astra
 REALM=palworld
+INSTANCE=2
 
 DISCORD_TOKEN=
 DISCORD_CLIENT_ID=
@@ -45,7 +47,21 @@ RCON_PORT=
 RCON_PASSWORD=
 ```
 
-`RCON_*` is a generic connection capability. A Realm that uses RCON validates those fields; a Realm that does not use RCON ignores them. `DISCORD_ADMIN_USER_IDS` is a comma-separated allowlist of Discord user IDs; every administrative command is denied by default.
+`INSTANCE` is optional: `palworld` plus an empty value identifies `palworld`; `palworld` plus `2` identifies `palworld2`. `RCON_*` is a generic connection capability. `DISCORD_ADMIN_USER_IDS` is a comma-separated allowlist; every administrative command is denied by default.
+
+## Lady Warden Master
+
+Lady Warden uses `ROLE=master` and the same image. It persists a catalog of registered Ladies in SQLite, mounted only into the Master container at `DATA_PATH` (default `/data`). Each Lady registers through the authenticated private endpoint `POST /v1/lady/register`; registration retries in the background until confirmed and never blocks the Lady.
+
+The Master provides three admin-only commands:
+
+| Command | Behavior |
+| --- | --- |
+| `/servers` | Shows every registered Lady with live server status and players. |
+| `/lady id` | Shows one registered Lady. |
+| `/sync` | Rechecks every registered Lady and refreshes its synchronization timestamp. |
+
+Lady and Master containers communicate only through the private `warden_net` Docker network. No internal API port is published to the host.
 
 ## Development
 
@@ -55,7 +71,7 @@ Docker is the only supported development and runtime environment.
 docker compose up --build
 ```
 
-The current MVP authenticates with the configured RCON target, executes a safe server-info check, registers global Discord commands, and connects the Guardian to Discord.
+Each Lady authenticates with its configured RCON target, executes a safe server-info check, registers Discord commands, and connects to Discord.
 
 ## Palworld commands
 

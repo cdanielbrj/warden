@@ -1,10 +1,10 @@
 # Warden — Architecture and Implementation Guide
 
 **Status:** Accepted baseline  
-**Software version:** 0.2.0
-**Architecture baseline:** 0.2
-**Document revision:** 2026-07-12
-**Initial Guardian:** Lady Astra  
+**Software version:** 0.3.0
+**Architecture baseline:** 0.3
+**Document revision:** 2026-07-19
+**Initial Lady:** Lady Astra
 **Initial Realm:** Palworld  
 **Runtime:** Docker only  
 **Primary language:** TypeScript  
@@ -16,9 +16,9 @@
 
 Warden is a modular framework for administering dedicated game servers through Discord.
 
-The first implementation is **Lady Astra**, a Discord bot responsible for administering exactly one Palworld server through its local RCON interface.
+The first implementation is **Lady Astra**, a Discord bot responsible for administering exactly one Palworld server through its local RCON interface. Version 0.3 introduces **Lady Warden**, the Master that aggregates registered Ladies.
 
-The initial project must remain deliberately small. The immediate goal is not to build a universal game-server platform, but to establish a clean foundation that can later support other games, other Guardians, and eventually a central hub called **Lady Warden**.
+The initial project must remain deliberately small. The immediate goal is not to build a universal game-server platform, but to establish a clean foundation that can later support other games, other Ladys, and eventually a central hub called **Lady Warden**.
 
 ---
 
@@ -36,17 +36,17 @@ Examples:
 - Docker image: `ghcr.io/<owner>/warden`
 - Package name: `warden`
 
-Warden does not know how to administer a specific game. It provides the runtime that hosts a Guardian and its Realm.
+Warden does not know how to administer a specific game. It provides the runtime that hosts a Lady and its Realm.
 
-### Guardian
+### Lady
 
 A deployed bot identity responsible for one game-server instance.
 
-The first Guardian is:
+The first Lady is:
 
 - **Lady Astra**
 
-A Guardian corresponds to:
+A Lady corresponds to:
 
 - one Discord Application;
 - one Discord bot token;
@@ -70,66 +70,66 @@ A Realm contains the commands, connection services, permission definitions, conf
 
 For the first version:
 
-- Guardian: Lady Astra
+- Lady: Lady Astra
 - Realm: Palworld
 - Target: one Palworld dedicated server
 
-### Target
+### Instance
 
-The concrete game-server deployment controlled by a Guardian.
+The concrete game-server deployment controlled by a Lady.
 
-A Target has a stable technical identifier such as:
+A Realm and optional Instance suffix form a stable technical identifier:
 
 - `palworld`
 - `palworld2`
 - `valheim`
 
-The Target identifier is independent from both the Guardian identity and the Realm.
+The Target identifier is independent from both the Lady identity and the Realm.
 
 Examples:
 
 ```text
 Lady Astra
-Guardian ID: astra
+Lady ID: astra
 Realm: palworld
-Target: palworld2
+Instance: 2 (`palworld2`)
 ```
 
 ```text
 Lady Iris
-Guardian ID: iris
+Lady ID: iris
 Realm: palworld
-Target: palworld
+Instance: empty (`palworld`)
 ```
 
-Multiple Guardians may use the same Realm while controlling different Targets.
+Multiple Ladys may use the same Realm while controlling different Targets.
 
 ### Server
 
-The single game-server instance represented by a Target and controlled by the running Guardian.
+The single game-server instance represented by a Target and controlled by the running Lady.
 
-In the Guardian runtime, a Warden container never needs to discover or select among multiple servers. Each container controls exactly one Target.
+In the Lady runtime, a Warden container never needs to discover or select among multiple servers. Each container controls exactly one Target.
 
 ### Lady Warden
 
 The future supervisor of the Warden ecosystem.
 
-Lady Warden uses the same repository and Docker image as every other Guardian, but operates at a different level of authority.
+Lady Warden uses the same repository and Docker image as every other Lady, but operates at a different level of authority.
 
-Lady Warden is responsible for cross-Guardian and infrastructure concerns such as:
+Lady Warden is responsible for cross-Lady and infrastructure concerns such as:
 
-- Guardian health aggregation;
+- Lady health aggregation;
 - maintenance orchestration;
 - schedules and recurring lifecycle operations;
 - container lifecycle through a restricted controller;
 - centralized alerts and audit;
-- coordinated operations across multiple Guardians.
+- coordinated operations across multiple Ladys.
 
-Lady Warden does not replace individual Guardians and must not implement game-specific behavior directly. Guardians remain autonomous and own all Realm-specific operations.
+Lady Warden does not replace individual Ladys and must not implement game-specific behavior directly. Ladys remain autonomous and own all Realm-specific operations.
 
 The architectural distinction is:
 
-> Individual Guardians administer game servers. Lady Warden administers the Warden ecosystem.
+> Individual Ladys administer game servers. Lady Warden administers the Warden ecosystem.
 
 ---
 
@@ -155,16 +155,16 @@ The Core must not:
 - contain player, save, broadcast, shutdown, kick, or ban behavior;
 - know Palworld connection details;
 - contain game-specific permission rules;
-- choose between multiple game servers in the Guardian runtime;
+- choose between multiple game servers in the Lady runtime;
 - contain `if game === "palworld"` branches spread across the application.
 
 Additional accepted rules:
 
-> A Guardian identity is not a Realm and is not a Target.
+> A Lady identity is not a Realm and is not a Target.
 
 > Discord is the human interface and audit surface. Coordination between Warden services must use authenticated private service-to-service communication, not bot messages as a command transport.
 
-> Lady Warden coordinates infrastructure and Guardians. Individual Guardians perform Realm-specific work.
+> Lady Warden coordinates infrastructure and Ladys. Individual Ladys perform Realm-specific work.
 
 > Lady Warden must never receive unrestricted access to the Docker host.
 
@@ -174,9 +174,9 @@ Additional accepted rules:
 
 The deployment model is:
 
-> One Guardian = one Discord Application = one token = one container = one game server.
+> One Lady = one Discord Application = one token = one container = one game server.
 
-All Guardians use the same Warden source code and Docker image. Their behavior differs through runtime configuration.
+All Ladys use the same Warden source code and Docker image. Their behavior differs through runtime configuration.
 
 Example:
 
@@ -195,7 +195,7 @@ ghcr.io/<owner>/warden:latest
 
 Multiple containers must never share the same Discord bot token.
 
-A Guardian identity represents a deployment, not a game category. Two Palworld servers therefore use two distinct Guardian identities and Discord Applications:
+A Lady identity represents a deployment, not a game category. Two Palworld servers therefore use two distinct Lady identities and Discord Applications:
 
 ```text
 Lady Astra
@@ -246,9 +246,9 @@ docker compose exec warden npm run build
 
 ### Runtime configuration
 
-The shared image is configured per Guardian through environment variables. Current `0.2.0` Core configuration is common to every Realm:
+The shared image is configured per Lady through environment variables. Current `0.2.0` Core configuration is common to every Realm:
 
-- `GUARDIAN_NAME`
+- `ROLE`
 - `REALM`
 - `DISCORD_TOKEN`
 - `DISCORD_CLIENT_ID`
@@ -262,15 +262,15 @@ Each Realm owns the validation of its game-specific needs. Realms that connect t
 
 The accepted identity model for a future migration is:
 
-- `GUARDIAN_ID`: canonical identity such as `astra`, `iris`, or `warden`;
-- `TARGET_ID`: stable deployment identifier such as `palworld`, `palworld2`, or `valheim`;
-- `REALM`: game implementation loaded by the Guardian.
+- `LADY_ID`: canonical identity such as `astra`, `iris`, or `warden`;
+- `INSTANCE`: stable deployment identifier such as `palworld`, `palworld2`, or `valheim`;
+- `REALM`: game implementation loaded by the Lady.
 
-`GUARDIAN_NAME` remains the current implemented field in `0.2.0`. It should eventually become a display name derived from `GUARDIAN_ID`, rather than unrestricted identity input.
+`ROLE` remains the current implemented field in `0.2.0`. It should eventually become a display name derived from `LADY_ID`, rather than unrestricted identity input.
 
 The root `.env.example` is the single configuration template for a Warden container. It contains shared settings and the connection capabilities currently used by the project. A Realm ignores values it does not use and validates the values it requires.
 
-Each deployed container must receive its own environment file or secret set. The Docker Compose file must not hard-code a particular Guardian identity.
+Each deployed container must receive its own environment file or secret set. The Docker Compose file must not hard-code a particular Lady identity.
 
 RCON transmits its password without transport encryption. RCON endpoints must remain private to the LAN or host-local Docker network and must never be exposed through a public tunnel or proxy.
 
@@ -283,7 +283,7 @@ returns the shared `Realm` contract.
 Game-server data follows a stable host-side layout:
 
 ```text
-/mnt/user/games/<TARGET_ID>/serverfiles/
+/mnt/user/games/<INSTANCE>/serverfiles/
 ```
 
 Examples:
@@ -297,7 +297,7 @@ Examples:
 Warden-managed backups follow the matching host-side convention:
 
 ```text
-/mnt/user/games/backups/<TARGET_ID>/
+/mnt/user/games/backups/<INSTANCE>/
 ```
 
 Examples:
@@ -317,7 +317,7 @@ Pal/Saved/Config/LinuxServer/PalWorldSettings.ini
 Therefore, the full host path is:
 
 ```text
-/mnt/user/games/<TARGET_ID>/serverfiles/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini
+/mnt/user/games/<INSTANCE>/serverfiles/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini
 ```
 
 Warden code must not hard-code `/mnt/user` host paths. Unraid maps the
@@ -327,15 +327,15 @@ Target-specific server-files directory to the stable container path:
 /data/serverfiles
 ```
 
-Current volume mappings for a Palworld Guardian are read/write because configuration edits and backups are implemented:
+Current volume mappings for a Palworld Lady are read/write because configuration edits and backups are implemented:
 
 ```yaml
 volumes:
-  - /mnt/user/games/<TARGET_ID>/serverfiles:/data/serverfiles:rw
-  - /mnt/user/games/backups/<TARGET_ID>:/data/backups:rw
+  - /mnt/user/games/<INSTANCE>/serverfiles:/data/serverfiles:rw
+  - /mnt/user/games/backups/<INSTANCE>:/data/backups:rw
 ```
 
-For example, Lady Iris maps `palworld` to those paths and Lady Astra maps `palworld2`. Each Guardian receives only the mounts for its own Target.
+For example, Lady Iris maps `palworld` to those paths and Lady Astra maps `palworld2`. Each Lady receives only the mounts for its own Target.
 
 The Realm resolves its own files relative to these stable container roots. The Palworld Realm therefore resolves:
 
@@ -442,7 +442,7 @@ Empty directories should only be created when they are about to receive a real f
 ### Environment variables
 
 ```env
-GUARDIAN_NAME=Lady Astra
+ROLE=Lady Astra
 REALM=palworld
 
 DISCORD_TOKEN=
@@ -457,20 +457,20 @@ RCON_PASSWORD=
 Accepted future identity fields:
 
 ```env
-GUARDIAN_ID=astra
-TARGET_ID=palworld
+LADY_ID=astra
+INSTANCE=palworld
 ```
 
 Definitions:
 
-- `GUARDIAN_NAME`: human-readable Guardian identity used in logs and responses.
+- `ROLE`: human-readable Lady identity used in logs and responses.
 - `REALM`: Realm loaded by this container.
 - `DISCORD_TOKEN`: bot token from the Discord Developer Portal.
 - `DISCORD_CLIENT_ID`: Discord Application ID.
-- `DISCORD_ADMIN_USER_IDS`: comma-separated Discord user IDs authorized to administer the Guardian.
+- `DISCORD_ADMIN_USER_IDS`: comma-separated Discord user IDs authorized to administer the Lady.
 - `RCON_HOST`, `RCON_PORT`, and `RCON_PASSWORD`: generic RCON connection settings. They are required and validated only by a Realm that uses RCON.
-- `GUARDIAN_ID`: planned canonical Guardian identity.
-- `TARGET_ID`: planned stable Target identifier and storage-directory key.
+- `LADY_ID`: planned canonical Lady identity.
+- `INSTANCE`: planned stable Target identifier and storage-directory key.
 
 The Discord Public Key is not required for the gateway-based `discord.js` client used by this project.
 
@@ -529,11 +529,11 @@ Contracts should remain small and expand only when an implemented feature requir
 Suggested initial shape:
 
 ```ts
-import type { GuardianCommand } from "./Command.js";
+import type { LadyCommand } from "./Command.js";
 
 export interface Realm {
   readonly name: string;
-  readonly commands: readonly GuardianCommand[];
+  readonly commands: readonly LadyCommand[];
 
   initialize(): Promise<void>;
 }
@@ -556,7 +556,7 @@ import type {
   SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 
-export interface GuardianCommand {
+export interface LadyCommand {
   readonly data:
     | SlashCommandBuilder
     | SlashCommandOptionsOnlyBuilder
@@ -636,7 +636,7 @@ The Realm owns:
 - game-specific execution;
 - game-specific response content.
 
-Commands are registered globally for the Guardian's Discord Application. A Guardian remains restricted by its own token and its `DISCORD_ADMIN_USER_IDS` allowlist.
+Commands are registered globally for the Lady's Discord Application. A Lady remains restricted by its own token and its `DISCORD_ADMIN_USER_IDS` allowlist.
 
 ### Implemented Palworld commands
 
@@ -661,7 +661,7 @@ Permissions are part of the Realm because different games may expose different a
 
 However, Discord identity and role retrieval are infrastructure provided by the Core.
 
-The first administrative phase implements a Guardian-level allowlist through `DISCORD_ADMIN_USER_IDS`. It denies access by default; richer command- and role-based permissions may be introduced later.
+The first administrative phase implements a Lady-level allowlist through `DISCORD_ADMIN_USER_IDS`. It denies access by default; richer command- and role-based permissions may be introduced later.
 
 Future Palworld permissions should be command-oriented, for example:
 
@@ -729,7 +729,7 @@ Do not log:
 
 Future administrative logs should include:
 
-- Guardian;
+- Lady;
 - Realm;
 - Discord user ID;
 - Discord username for readability;
@@ -901,7 +901,7 @@ Acceptance criteria:
 1. `docker compose up --build` starts Warden.
 2. Warden loads only the `palworld` Realm.
 3. Lady Astra connects to Discord.
-4. Realm commands are registered globally for the Guardian Application.
+4. Realm commands are registered globally for the Lady Application.
 5. Interactions route to the selected Realm.
 6. Missing required configuration stops the container with a useful error.
 7. The project type-checks successfully inside Docker.
@@ -976,27 +976,27 @@ Future work can add a configuration diff, rollback, and restart reporting.
 
 ### Future — Lady Warden supervisor
 
-Lady Warden remains out of scope until multiple independent Guardians are stable.
+Lady Warden remains out of scope until multiple independent Ladys are stable.
 
 Accepted future responsibilities:
 
 - health aggregation;
-- authenticated coordination with Guardians;
+- authenticated coordination with Ladys;
 - schedules such as daily server restarts;
 - orchestration of prepare, stop, container restart, and post-restart validation;
 - centralized alerts and audit;
 - restricted container lifecycle management.
 
-Lady Warden uses the same repository and Docker image as individual Guardians,
+Lady Warden uses the same repository and Docker image as individual Ladys,
 but will be a future supervisor mode rather than a game Realm.
 
-Individual Guardians remain necessary because they own Realm-specific work. Lady Warden must communicate with them through a private authenticated service contract rather than by sending Discord commands or parsing bot messages.
+Individual Ladys remain necessary because they own Realm-specific work. Lady Warden must communicate with them through a private authenticated service contract rather than by sending Discord commands or parsing bot messages.
 
 Any future Docker integration must be restricted to Warden-managed containers, preferably through a limited controller or Docker Socket Proxy and labels such as:
 
 ```text
 warden.managed=true
-warden.guardian=astra
+warden.lady=astra
 warden.realm=palworld
 ```
 
@@ -1077,8 +1077,8 @@ Never commit:
 
 The following capabilities remain outside the immediate Palworld configuration-management delivery:
 
-- multiple servers in one Guardian container;
-- multiple Realms in one Guardian process;
+- multiple servers in one Lady container;
+- multiple Realms in one Lady process;
 - selection menus for server instances;
 - Lady Warden implementation;
 - unrestricted Docker socket access;
@@ -1102,12 +1102,12 @@ Configuration backups and rollback are explicitly in scope for the Palworld conf
 4. Authorization denies access by default.
 5. Destructive actions require stronger permissions and confirmation.
 6. Logs must be useful without revealing credentials.
-7. A compromised Guardian token should affect only that Guardian.
-8. Each Guardian uses a distinct Discord Application and token.
+7. A compromised Lady token should affect only that Lady.
+8. Each Lady uses a distinct Discord Application and token.
 9. The bot should request only the Discord permissions and gateway intents it actually needs.
 10. No privileged Docker socket access should be introduced without a specific reviewed need.
 11. Host paths must be injected through container mounts; application code must not hard-code Unraid host paths.
-12. A Guardian may access only the Target server files and backup directory mounted into its own container.
+12. A Lady may access only the Target server files and backup directory mounted into its own container.
 13. Configuration writes require backup, validation, temporary-file generation, and atomic replacement.
 14. Lady Warden must use restricted infrastructure control and may act only on explicitly Warden-managed containers.
 
@@ -1119,7 +1119,7 @@ When modifying this repository:
 
 1. Read this document before proposing structural changes.
 2. Preserve the one-container-per-server deployment model.
-3. Keep all game-specific behavior inside `src/realms/<realm>/`.
+3. Keep all game-specific behavior inside `src/lady/realms/<realm>/`.
 4. Keep the Core independent of Palworld and RCON.
 5. Do not introduce a new dependency without explaining the immediate requirement.
 6. Run type-checking or the relevant Docker command after edits.
@@ -1132,13 +1132,13 @@ When modifying this repository:
 13. Treat this document as the current architectural source of truth.
 14. When code and this document conflict, identify the conflict before changing the architecture.
 15. Update this document when an accepted architectural decision changes.
-16. Treat `GUARDIAN_ID`, `REALM`, and `TARGET_ID` as separate concepts.
+16. Treat `LADY_ID`, `REALM`, and `INSTANCE` as separate concepts.
 17. Resolve Target files from mounted container roots; never build application paths from `/mnt/user`.
 18. Preserve unknown Palworld settings when parsing and rewriting `OptionSettings`.
 19. Write the real Palworld settings file only through validation, a shared
     configuration backup, temporary-file generation, and atomic replacement.
 20. Use the writable backup mount only for Warden-managed snapshots of that
-    Guardian's Target.
+    Lady's Target.
 
 ---
 

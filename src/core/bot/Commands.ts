@@ -1,10 +1,10 @@
 import { REST, Routes } from "discord.js";
 import { env } from "../config/env.js";
 import { Logger } from "../logger/Logger.js";
-import type { GuardianCommand } from "../types/Command.js";
+import type { WardenCommand } from "../types/Command.js";
 
 export async function registerGlobalCommands(
-  commands: readonly GuardianCommand[],
+  commands: readonly WardenCommand[],
 ): Promise<void> {
   const rest = new REST({ version: "10" }).setToken(env.discordToken);
 

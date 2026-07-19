@@ -1,27 +1,29 @@
 import { EmbedBuilder, type Client } from "discord.js";
-import type { GuardianStatus } from "../../core/types/GuardianStatus.js";
-import type { GuardianOverview } from "../services/GuardianOverviewService.js";
+import type { LadyOverview } from "../services/LadyOverviewService.js";
 
 export class ServersEmbedFactory {
   constructor(private readonly client: Client) {}
 
-  async create(overviews: readonly GuardianOverview[]): Promise<EmbedBuilder[]> {
-    return Promise.all(overviews.map((overview) => this.createGuardianEmbed(overview)));
+  async create(overviews: readonly LadyOverview[]): Promise<EmbedBuilder[]> {
+    return Promise.all(overviews.map((overview) => this.createLadyEmbed(overview)));
   }
 
-  private async createGuardianEmbed(overview: GuardianOverview): Promise<EmbedBuilder> {
+  private async createLadyEmbed(overview: LadyOverview): Promise<EmbedBuilder> {
     if (!overview.status) {
       return new EmbedBuilder()
         .setColor(0xed4245)
         .setTitle(overview.endpoint.id)
-        .setDescription("Guardian status is unavailable.");
+        .setDescription("Lady status is unavailable.");
     }
 
     const { status } = overview;
+    const user = await this.client.users.fetch(status.discordBotId).catch(() => undefined);
+    const displayName = user?.globalName ?? user?.username ?? `Lady ${status.ladyId}`;
+
     const embed = new EmbedBuilder()
       .setColor(status.gameStatus === "online" ? 0x57f287 : 0xed4245)
-      .setTitle(status.guardianName)
-      .setDescription(`${status.realm} · ${status.targetId}`)
+      .setTitle(displayName)
+      .setDescription(`${status.realm} · ${status.instanceId}`)
       .addFields(
         {
           name: "Status",
@@ -36,7 +38,6 @@ export class ServersEmbedFactory {
       )
       .setTimestamp(new Date(status.checkedAt));
 
-    const user = await this.client.users.fetch(status.discordBotId).catch(() => undefined);
     if (user) {
       embed.setThumbnail(user.displayAvatarURL());
     }

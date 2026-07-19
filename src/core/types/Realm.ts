@@ -1,9 +1,9 @@
-import type { GuardianCommand } from "./Command.js";
-import type { RealmStatus } from "./GuardianStatus.js";
+import type { WardenCommand } from "./Command.js";
+import type { RealmStatus } from "./LadyStatus.js";
 
 export interface Realm {
   readonly name: string;
-  readonly commands: readonly GuardianCommand[];
+  readonly commands: readonly WardenCommand[];
   initialize(): Promise<void>;
   getStatus(): Promise<RealmStatus>;
 }

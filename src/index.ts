@@ -1,5 +1,5 @@
 import { Logger } from "./core/logger/Logger.js";
-import { bootstrapBot } from "./core/bot/Bootstrap.js";
+import { bootstrapBot } from "./Bootstrap.js";
 
 async function main() {
   Logger.info("Starting Warden...");

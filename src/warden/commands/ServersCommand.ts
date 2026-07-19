@@ -4,19 +4,20 @@ import {
   deferPrivateResponse,
 } from "../../core/services/discord/InteractionResponseService.js";
 import { requireDiscordAdmin } from "../../core/services/discord/AuthorizationService.js";
-import type { GuardianCommand } from "../../core/types/Command.js";
+import type { WardenCommand } from "../../core/types/Command.js";
 import { ServersEmbedFactory } from "../presentation/ServersEmbedFactory.js";
-import { GuardianOverviewService } from "../services/GuardianOverviewService.js";
+import { LadyOverviewService } from "../services/LadyOverviewService.js";
+import type { LadyRegistryService } from "../services/LadyRegistryService.js";
 
-export function createServersCommand(client: Client): GuardianCommand {
+export function createServersCommand(client: Client, registry: LadyRegistryService): WardenCommand {
   const resultVisibility = () => "public" as const;
-  const overviewService = new GuardianOverviewService();
+  const overviewService = new LadyOverviewService(registry);
   const embedFactory = new ServersEmbedFactory(client);
 
   return {
     data: new SlashCommandBuilder()
       .setName("servers")
-      .setDescription("Show the current status of every managed Guardian")
+      .setDescription("Show the current status of every managed Lady")
       .setDMPermission(false),
 
     resultVisibility,

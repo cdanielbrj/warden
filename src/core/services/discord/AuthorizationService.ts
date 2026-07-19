@@ -13,7 +13,7 @@ export async function requireDiscordAdmin(
   }
 
   await interaction.reply({
-    content: "You are not authorized to administer this Guardian.",
+    content: "You are not authorized to administer this Lady.",
     flags: MessageFlags.Ephemeral,
   });
   return false;
