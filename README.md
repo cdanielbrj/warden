@@ -2,7 +2,7 @@
 
 Warden is a Docker-first framework for administering dedicated game servers through Discord.
 
-Current release: **0.3.1**.
+Current release: **0.3.2**.
 
 ## Operating model
 
@@ -68,7 +68,7 @@ The Master provides three admin-only commands:
 | --- | --- |
 | `/servers` | Shows every registered Lady with live server status and players. |
 | `/lady id` | Shows one registered Lady. |
-| `/sync` | Rechecks every registered Lady and refreshes its synchronization timestamp. |
+| `/sync` | Rechecks availability for every registered Lady without querying players. |
 
 Lady and Master containers communicate only through the private `warden_net` Docker network. No internal API port is published to the host.
 

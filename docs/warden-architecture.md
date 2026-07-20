@@ -1,7 +1,7 @@
 # Warden — Architecture and Implementation Guide
 
 **Status:** Accepted baseline  
-**Software version:** 0.3.1
+**Software version:** 0.3.2
 **Architecture baseline:** 0.3
 **Document revision:** 2026-07-20
 **Initial Lady:** Lady Astra
@@ -526,7 +526,7 @@ Expected startup sequence:
 Expected startup logs:
 
 ```text
-[INFO] Starting Lady iris for palworld (build v0.3.1).
+[INFO] Starting Lady iris for palworld (build v0.3.2).
 [INFO] Authenticating RCON connection to <host>:<port>.
 [SUCCESS] RCON authentication succeeded for <host>:<port>.
 [SUCCESS] Private Lady status API is listening on port 3000.
@@ -907,7 +907,7 @@ Already validated:
 Current successful output is conceptually:
 
 ```text
-[INFO] Starting Lady iris for palworld (build v0.3.1).
+[INFO] Starting Lady iris for palworld (build v0.3.2).
 [INFO] Authenticating RCON connection to <host>:<port>.
 [SUCCESS] RCON authentication succeeded for <host>:<port>.
 [SUCCESS] Registered 6 global Discord command(s).
@@ -1017,7 +1017,10 @@ Future work can add a configuration diff, rollback, and restart reporting.
 Lady Warden uses the same repository and Docker image as individual Ladies in
 `ROLE=master`. It persists registrations in SQLite and queries registered
 Ladies through authenticated private APIs. The current commands are `/servers`,
-`/lady`, and `/sync`.
+`/lady`, and `/sync`. Synchronization requests availability only; `/servers`
+and `/lady` additionally request the player list for presentation. Their
+online embeds use a single `Status` field with the player summary; unavailable
+Ladies show only their wellness message.
 
 ### Future — Lady Warden infrastructure control
 
@@ -1113,7 +1116,7 @@ Never commit:
 
 ---
 
-## 21. Non-goals for version 0.3.1
+## 21. Non-goals for version 0.3.2
 
 The following capabilities remain outside the immediate Palworld configuration-management delivery:
 
@@ -1185,7 +1188,7 @@ When modifying this repository:
 
 Validate the Master deployment with Lady Iris:
 
-1. publish the `0.3.1` image and update Lady Iris before the Master;
+1. publish the `0.3.2` image and update Lady Iris before the Master;
 2. confirm retry registration, `/servers`, `/lady`, and `/sync` after the
    Master starts;
 3. restart only the Master and confirm its SQLite registry still lists Iris;
