@@ -23,7 +23,7 @@ interface PacketWaiter {
   timeout: NodeJS.Timeout;
 }
 
-export class RconClient {
+export class PalworldRconClient {
   private readonly packets: RconPacket[] = [];
   private readonly waiters: PacketWaiter[] = [];
   private buffer = Buffer.alloc(0);
@@ -50,7 +50,7 @@ export class RconClient {
     host: string,
     port: number,
     timeoutMs = RCON_TIMEOUT_MS,
-  ): Promise<RconClient> {
+  ): Promise<PalworldRconClient> {
     const target = `${host}:${port}`;
 
     return new Promise((resolve, reject) => {
@@ -73,7 +73,7 @@ export class RconClient {
       socket.once("connect", () => {
         clearTimeout(timeout);
         socket.removeAllListeners("error");
-        resolve(new RconClient(socket, target, timeoutMs));
+        resolve(new PalworldRconClient(socket, target, timeoutMs));
       });
     });
   }
@@ -179,8 +179,8 @@ export class RconClient {
         return;
       }
 
-      const totalLength = length + 4;
-      if (this.buffer.length < totalLength) {
+      const totalLength = this.getPacketLength(length);
+      if (!totalLength) {
         return;
       }
 
@@ -214,6 +214,23 @@ export class RconClient {
     const [waiter] = this.waiters.splice(waiterIndex, 1);
     clearTimeout(waiter.timeout);
     waiter.resolve(packet);
+  }
+
+  private getPacketLength(length: number): number | undefined {
+    const terminatedPacketLength = length + 2;
+    // Palworld may report a length two bytes larger than its terminated packet.
+    if (
+      this.buffer.length === terminatedPacketLength &&
+      this.buffer[terminatedPacketLength - 2] === 0 &&
+      this.buffer[terminatedPacketLength - 1] === 0
+    ) {
+      return terminatedPacketLength;
+    }
+
+    const standardPacketLength = length + 4;
+    return this.buffer.length >= standardPacketLength
+      ? standardPacketLength
+      : undefined;
   }
 
   private fail(error: Error): void {

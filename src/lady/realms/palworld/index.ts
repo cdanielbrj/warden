@@ -4,7 +4,7 @@ import type { Realm } from "../../../core/types/Realm.js";
 import { createPalworldCommands } from "./commands/index.js";
 import { palworldEnv } from "./config/env.js";
 import { palworldPaths } from "./config/Paths.js";
-import { RconClient } from "./services/RconConnection.js";
+import { PalworldRconClient } from "./services/PalworldRconConnection.js";
 import { PalworldRconService } from "./services/PalworldRconService.js";
 import { PalworldBackupService } from "./services/PalworldBackupService.js";
 import { PalworldSettingsService } from "./services/PalworldSettingsService.js";
@@ -27,7 +27,7 @@ export function createRealm(): Realm {
       const target = `${palworldEnv.rconHost}:${palworldEnv.rconPort}`;
 
       Logger.info(`Authenticating RCON connection to ${target}.`);
-      const rcon = await RconClient.connect(
+      const rcon = await PalworldRconClient.connect(
         palworldEnv.rconHost,
         palworldEnv.rconPort,
       );

@@ -1,6 +1,6 @@
 import { palworldEnv } from "../config/env.js";
 import type { RealmStatus } from "../../../../core/types/LadyStatus.js";
-import { RconClient } from "./RconConnection.js";
+import { PalworldRconClient } from "./PalworldRconConnection.js";
 
 export class PalworldRconService {
   async status(): Promise<string> {
@@ -38,8 +38,8 @@ export class PalworldRconService {
     }
   }
 
-  private async connect(): Promise<RconClient> {
-    const rcon = await RconClient.connect(
+  private async connect(): Promise<PalworldRconClient> {
+    const rcon = await PalworldRconClient.connect(
       palworldEnv.rconHost,
       palworldEnv.rconPort,
     );
