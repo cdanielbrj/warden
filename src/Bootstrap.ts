@@ -86,11 +86,16 @@ async function startDiscordBot(
       return;
     }
 
+    Logger.info(`Discord command /${interaction.commandName} received.`);
+
     try {
       await command.execute(interaction);
+      Logger.info(`Discord command /${interaction.commandName} handled.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      Logger.error(`Command ${interaction.commandName} failed: ${message}`);
+      Logger.error(
+        `Discord command /${interaction.commandName} failed: ${message}`,
+      );
 
       const response = "Unable to complete that command. Check the Warden logs.";
       if (interaction.deferred || interaction.replied) {

@@ -1,5 +1,6 @@
 import { cp, mkdir, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { Logger } from "../../logger/Logger.js";
 
 export interface BackupCopyRequest {
   readonly category: string;
@@ -24,6 +25,7 @@ export class BackupStorageService {
     const backupPath = join(backupDirectory, request.name);
 
     try {
+      Logger.info(`Creating ${request.category} backup ${request.name}.`);
       await cp(request.sourcePath, backupPath, {
         errorOnExist: true,
         filter: request.filter,
@@ -36,7 +38,9 @@ export class BackupStorageService {
       throw new Error(`Unable to copy backup source: ${message}`);
     }
 
-    return { path: `${request.category}/${request.name}` };
+    const backup = { path: `${request.category}/${request.name}` };
+    Logger.success(`Created ${request.category} backup ${backup.path}.`);
+    return backup;
   }
 
   private async createBackupDirectory(category: string): Promise<string> {

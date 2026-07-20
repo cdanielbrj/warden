@@ -1,5 +1,6 @@
 import { readFile, rename, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { Logger } from "../../../../core/logger/Logger.js";
 import { palworldPaths } from "../config/Paths.js";
 import {
   getPalworldSettingDefinition,
@@ -30,6 +31,7 @@ export class PalworldSettingsService {
   }
 
   async update(key: string, value: string): Promise<PalworldSettingsUpdate> {
+    Logger.info(`Updating Palworld setting ${key}.`);
     const source = await this.readSource();
     const document = parsePalworldSettings(source);
     if (document.get(key) === undefined) {
@@ -63,6 +65,7 @@ export class PalworldSettingsService {
       throw new Error(`Unable to update Palworld settings: ${message}`);
     }
 
+    Logger.success(`Updated Palworld setting ${key}; backup ${backup.path} created.`);
     return { backupPath: backup.path, value: updatedValue };
   }
 

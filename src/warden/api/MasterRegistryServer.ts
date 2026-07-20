@@ -16,13 +16,16 @@ export async function startMasterRegistryServer(registry: LadyRegistryService): 
   if (!env.internalApiToken) throw new Error("Missing environment variable: WARDEN_INTERNAL_API_TOKEN");
   const server = createServer(async (request, response) => {
     if (request.method !== "POST" || request.url !== "/v1/lady/register" || request.headers.authorization !== `Bearer ${env.internalApiToken}`) {
+      Logger.warn("Rejected Lady registration request.");
       response.writeHead(request.headers.authorization ? 404 : 401).end(); return;
     }
     try {
+      Logger.info("Receiving Lady registration request.");
       const registration = await readRegistration(request);
       const address = request.socket.remoteAddress?.replace(/^::ffff:/, "");
       if (!address) throw new Error("Missing source address.");
       registry.register({ ...registration, apiUrl: `http://${address}:${registration.apiPort}` });
+      Logger.success(`Detected Lady ${registration.id} for ${registration.instanceId}.`);
       response.writeHead(204).end();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Invalid registration.";

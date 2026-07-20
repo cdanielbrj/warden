@@ -7,6 +7,7 @@ export function startLadyRegistration(): void {
   if (!env.internalApiToken) { Logger.info("Master registration is disabled until its token is configured."); return; }
   const register = async (): Promise<void> => {
     try {
+      Logger.info("Registering Lady with the Master.");
       const response = await fetch(`${env.masterUrl}/v1/lady/register`, { method: "POST", headers: { authorization: `Bearer ${env.internalApiToken}`, "content-type": "application/json" }, body: JSON.stringify({ id: env.id, realm: env.realm, instance: env.instance, instanceId: env.instanceId, discordBotId: env.discordClientId, apiPort: env.internalApiPort }), signal: AbortSignal.timeout(5_000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       Logger.success("Registered with the Master.");

@@ -17,14 +17,19 @@ export async function startLadyStatusServer(realm: Realm): Promise<void> {
       request.url !== "/v1/status" ||
       request.headers.authorization !== `Bearer ${env.internalApiToken}`
     ) {
+      Logger.warn("Rejected private Lady status request.");
       response.writeHead(request.headers.authorization ? 404 : 401).end();
       return;
     }
 
+    Logger.info("Serving private Lady status request.");
     const status = await statusService.getStatus();
     response
       .writeHead(200, { "content-type": "application/json; charset=utf-8" })
       .end(JSON.stringify(status));
+    Logger.success(
+      `Private Lady status request completed: ${status.gameStatus}${status.playerNames ? ` (${status.playerNames.length} player(s))` : ""}.`,
+    );
   });
 
   await new Promise<void>((resolve, reject) => {

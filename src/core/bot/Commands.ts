@@ -8,6 +8,7 @@ export async function registerGlobalCommands(
 ): Promise<void> {
   const rest = new REST({ version: "10" }).setToken(env.discordToken);
 
+  Logger.info(`Registering ${commands.length} global Discord command(s).`);
   await rest.put(Routes.applicationCommands(env.discordClientId), {
     body: commands.map((command) => command.data.toJSON()),
   });

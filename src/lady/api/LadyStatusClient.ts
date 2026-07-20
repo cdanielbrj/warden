@@ -1,4 +1,5 @@
 import type { LadyEndpoint, LadyStatus } from "../../core/types/LadyStatus.js";
+import { Logger } from "../../core/logger/Logger.js";
 
 const STATUS_TIMEOUT_MS = 5_000;
 
@@ -6,6 +7,7 @@ export async function fetchLadyStatus(
   endpoint: LadyEndpoint,
   token: string,
 ): Promise<LadyStatus> {
+  Logger.info(`Requesting status from Lady ${endpoint.id}.`);
   const response = await fetch(`${endpoint.url}/v1/status`, {
     headers: { authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(STATUS_TIMEOUT_MS),
@@ -27,5 +29,6 @@ export async function fetchLadyStatus(
     throw new Error(`Lady ${endpoint.id} returned an invalid status response.`);
   }
 
+  Logger.success(`Received status from Lady ${endpoint.id}.`);
   return status as LadyStatus;
 }

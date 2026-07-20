@@ -1,4 +1,5 @@
 import { palworldEnv } from "../config/env.js";
+import { Logger } from "../../../../core/logger/Logger.js";
 import type { RealmStatus } from "../../../../core/types/LadyStatus.js";
 import { PalworldRconClient } from "./PalworldRconConnection.js";
 
@@ -29,12 +30,22 @@ export class PalworldRconService {
   }
 
   private async execute(command: string): Promise<string> {
-    const rcon = await this.connect();
+    const operation = command.split(" ", 1)[0];
+    Logger.info(`Palworld RCON ${operation} requested.`);
 
     try {
-      return await rcon.execute(command);
-    } finally {
-      rcon.close();
+      const rcon = await this.connect();
+      try {
+        const response = await rcon.execute(command);
+        Logger.success(`Palworld RCON ${operation} completed.`);
+        return response;
+      } finally {
+        rcon.close();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      Logger.warn(`Palworld RCON ${operation} failed: ${message}`);
+      throw error;
     }
   }
 
