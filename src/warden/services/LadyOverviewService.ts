@@ -11,27 +11,53 @@ export interface LadyOverview {
   readonly status?: LadyStatus;
 }
 
+interface LadyOverviewOptions {
+  readonly includePlayers?: boolean;
+}
+
 export class LadyOverviewService {
   constructor(private readonly registry: LadyRegistryService) {}
-  async getOverviews(): Promise<readonly LadyOverview[]> {
+
+  async getOverviews(
+    options: LadyOverviewOptions = {},
+  ): Promise<readonly LadyOverview[]> {
     return Promise.all(
       this.registry.list().map(async (lady) => ({
         lady,
         endpoint: { id: lady.id, url: lady.apiUrl },
-        status: await this.getStatus(lady.id, { id: lady.id, url: lady.apiUrl }),
+        status: await this.getStatus(
+          lady.id,
+          { id: lady.id, url: lady.apiUrl },
+          options,
+        ),
       })),
     );
   }
 
-  async getOverview(id: string): Promise<LadyOverview | undefined> {
+  async getOverview(
+    id: string,
+    options: LadyOverviewOptions = {},
+  ): Promise<LadyOverview | undefined> {
     const lady = this.registry.get(id);
-    if (!lady) return undefined;
-    return { lady, endpoint: { id: lady.id, url: lady.apiUrl }, status: await this.getStatus(lady.id, { id: lady.id, url: lady.apiUrl }) };
+    if (!lady) {
+      return undefined;
+    }
+
+    const endpoint = { id: lady.id, url: lady.apiUrl };
+    return {
+      lady,
+      endpoint,
+      status: await this.getStatus(lady.id, endpoint, options),
+    };
   }
 
-  private async getStatus(id: string, endpoint: LadyEndpoint): Promise<LadyStatus | undefined> {
+  private async getStatus(
+    id: string,
+    endpoint: LadyEndpoint,
+    options: LadyOverviewOptions = {},
+  ): Promise<LadyStatus | undefined> {
     try {
-      const status = await fetchLadyStatus(endpoint, env.internalApiToken!);
+      const status = await fetchLadyStatus(endpoint, env.internalApiToken!, options);
       this.registry.markSynced(id);
       if (status.gameStatus === "offline") {
         Logger.warn(`Lady ${id} reported an unavailable status: ${status.diagnostic ?? "No diagnostic provided."}`);

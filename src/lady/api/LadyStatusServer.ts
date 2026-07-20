@@ -12,9 +12,10 @@ export async function startLadyStatusServer(realm: Realm): Promise<void> {
 
   const statusService = new LadyStatusService(realm);
   const server = createServer(async (request, response) => {
+    const url = new URL(request.url ?? "/", "http://lady");
     if (
       request.method !== "GET" ||
-      request.url !== "/v1/status" ||
+      url.pathname !== "/v1/status" ||
       request.headers.authorization !== `Bearer ${env.internalApiToken}`
     ) {
       Logger.warn("Rejected private Lady status request.");
@@ -23,7 +24,9 @@ export async function startLadyStatusServer(realm: Realm): Promise<void> {
     }
 
     Logger.info("Serving private Lady status request.");
-    const status = await statusService.getStatus();
+    const status = await statusService.getStatus({
+      includePlayers: url.searchParams.get("players") === "true",
+    });
     response
       .writeHead(200, { "content-type": "application/json; charset=utf-8" })
       .end(JSON.stringify(status));

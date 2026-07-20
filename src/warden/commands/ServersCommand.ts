@@ -28,7 +28,9 @@ export function createServersCommand(client: Client, registry: LadyRegistryServi
       }
 
       await deferPrivateResponse(interaction);
-      const overviews = await overviewService.getOverviews();
+      const overviews = await overviewService.getOverviews({
+        includePlayers: true,
+      });
       const embeds = await embedFactory.create(overviews);
 
       await completeCommandEmbeds(interaction, resultVisibility, embeds);

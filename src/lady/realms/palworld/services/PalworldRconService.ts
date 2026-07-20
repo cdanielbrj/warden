@@ -16,9 +16,12 @@ export class PalworldRconService {
     return parsePlayerNames(await this.players());
   }
 
-  async getStatus(): Promise<RealmStatus> {
+  async getStatus(includePlayers = false): Promise<RealmStatus> {
     await this.status();
-    return { gameStatus: "online", playerNames: await this.playerNames() };
+    return {
+      gameStatus: "online",
+      playerNames: includePlayers ? await this.playerNames() : undefined,
+    };
   }
 
   async save(): Promise<string> {

@@ -1,14 +1,14 @@
 import { env } from "../../core/config/env.js";
 import { Logger } from "../../core/logger/Logger.js";
 import type { LadyStatus } from "../../core/types/LadyStatus.js";
-import type { Realm } from "../../core/types/Realm.js";
+import type { Realm, RealmStatusOptions } from "../../core/types/Realm.js";
 
 export class LadyStatusService {
   constructor(private readonly realm: Realm) {}
 
-  async getStatus(): Promise<LadyStatus> {
+  async getStatus(options?: RealmStatusOptions): Promise<LadyStatus> {
     try {
-      const realmStatus = await this.realm.getStatus();
+      const realmStatus = await this.realm.getStatus(options);
       return this.createStatus(realmStatus);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";

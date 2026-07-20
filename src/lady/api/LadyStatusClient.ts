@@ -3,12 +3,22 @@ import { Logger } from "../../core/logger/Logger.js";
 
 const STATUS_TIMEOUT_MS = 5_000;
 
+interface LadyStatusRequest {
+  readonly includePlayers?: boolean;
+}
+
 export async function fetchLadyStatus(
   endpoint: LadyEndpoint,
   token: string,
+  request: LadyStatusRequest = {},
 ): Promise<LadyStatus> {
   Logger.info(`Requesting status from Lady ${endpoint.id}.`);
-  const response = await fetch(`${endpoint.url}/v1/status`, {
+  const url = new URL("/v1/status", endpoint.url);
+  if (request.includePlayers) {
+    url.searchParams.set("players", "true");
+  }
+
+  const response = await fetch(url, {
     headers: { authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(STATUS_TIMEOUT_MS),
   });

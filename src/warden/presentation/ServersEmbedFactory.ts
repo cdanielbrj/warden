@@ -12,15 +12,11 @@ export class ServersEmbedFactory {
     const user = await this.client.users.fetch(overview.lady.discordBotId).catch(() => undefined);
     const displayName = user?.globalName ?? user?.username ?? `Lady ${overview.lady.id}`;
 
-    if (!overview.status) {
+    if (!overview.status || overview.status.gameStatus !== "online") {
       const embed = new EmbedBuilder()
         .setColor(0xed4245)
         .setTitle(displayName)
-        .setDescription(`${displayName}'s wellness is unknown.`)
-        .addFields(
-          { name: "Status", value: "Unavailable", inline: true },
-          { name: "Players", value: "Unknown", inline: true },
-        );
+        .setDescription(`${displayName} wellness is unknown.`);
 
       if (user) embed.setThumbnail(user.displayAvatarURL());
       return embed;
@@ -35,16 +31,10 @@ export class ServersEmbedFactory {
       .addFields(
         {
           name: "Status",
-          value: status.gameStatus === "online" ? "Online" : "Offline",
-          inline: true,
-        },
-        {
-          name: "Players",
           value: formatPlayers(status.playerNames),
-          inline: true,
+          inline: false,
         },
-      )
-      .setTimestamp(new Date(status.checkedAt));
+      );
 
     if (user) {
       embed.setThumbnail(user.displayAvatarURL());
@@ -55,12 +45,8 @@ export class ServersEmbedFactory {
 }
 
 function formatPlayers(playerNames: readonly string[] | undefined): string {
-  if (!playerNames) {
-    return "Unavailable";
-  }
-
-  if (playerNames.length === 0) {
-    return "No one near.";
+  if (!playerNames || playerNames.length === 0) {
+    return "I can see no one near me.";
   }
 
   const names = playerNames.join(", ");

@@ -19,8 +19,8 @@ export function createRealm(): Realm {
     name: "Palworld",
     commands: createPalworldCommands(rcon, settings, backups),
 
-    getStatus() {
-      return rcon.getStatus();
+    getStatus(options) {
+      return rcon.getStatus(options?.includePlayers);
     },
 
     async initialize() {
