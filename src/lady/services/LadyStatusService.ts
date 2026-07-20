@@ -13,14 +13,14 @@ export class LadyStatusService {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       Logger.warn(`Lady status check failed: ${message}`);
-      return this.createStatus({ gameStatus: "offline" });
+      return this.createStatus({ gameStatus: "offline" }, message);
     }
   }
 
   private createStatus(status: {
     readonly gameStatus: LadyStatus["gameStatus"];
     readonly playerNames?: readonly string[];
-  }): LadyStatus {
+  }, diagnostic?: string): LadyStatus {
     return {
       ladyId: env.id,
       realm: env.realm!,
@@ -28,6 +28,7 @@ export class LadyStatusService {
       discordBotId: env.discordClientId,
       gameStatus: status.gameStatus,
       playerNames: status.playerNames,
+      diagnostic,
       checkedAt: new Date().toISOString(),
     };
   }

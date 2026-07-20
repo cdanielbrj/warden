@@ -16,15 +16,8 @@ export class PalworldRconService {
   }
 
   async getStatus(): Promise<RealmStatus> {
-    const rcon = await this.connect();
-
-    try {
-      await rcon.execute("Info");
-      const players = parsePlayerNames(await rcon.execute("ShowPlayers"));
-      return { gameStatus: "online", playerNames: players };
-    } finally {
-      rcon.close();
-    }
+    await this.status();
+    return { gameStatus: "online", playerNames: await this.playerNames() };
   }
 
   async save(): Promise<string> {

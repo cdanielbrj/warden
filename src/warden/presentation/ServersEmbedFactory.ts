@@ -9,21 +9,29 @@ export class ServersEmbedFactory {
   }
 
   private async createLadyEmbed(overview: LadyOverview): Promise<EmbedBuilder> {
+    const user = await this.client.users.fetch(overview.lady.discordBotId).catch(() => undefined);
+    const displayName = user?.globalName ?? user?.username ?? `Lady ${overview.lady.id}`;
+
     if (!overview.status) {
-      return new EmbedBuilder()
+      const embed = new EmbedBuilder()
         .setColor(0xed4245)
-        .setTitle(overview.endpoint.id)
-        .setDescription("Lady status is unavailable.");
+        .setTitle(displayName)
+        .setDescription(`${displayName}'s wellness is unknown.`)
+        .addFields(
+          { name: "Status", value: "Unavailable", inline: true },
+          { name: "Players", value: "Unknown", inline: true },
+        );
+
+      if (user) embed.setThumbnail(user.displayAvatarURL());
+      return embed;
     }
 
     const { status } = overview;
-    const user = await this.client.users.fetch(status.discordBotId).catch(() => undefined);
-    const displayName = user?.globalName ?? user?.username ?? `Lady ${status.ladyId}`;
 
     const embed = new EmbedBuilder()
       .setColor(status.gameStatus === "online" ? 0x57f287 : 0xed4245)
       .setTitle(displayName)
-      .setDescription(`${status.realm} · ${status.instanceId}`)
+      .setDescription(`${displayName} is assisting **${status.realm}**.`)
       .addFields(
         {
           name: "Status",
@@ -52,9 +60,9 @@ function formatPlayers(playerNames: readonly string[] | undefined): string {
   }
 
   if (playerNames.length === 0) {
-    return "0";
+    return "No one near.";
   }
 
   const names = playerNames.join(", ");
-  return names.length <= 900 ? `${playerNames.length} — ${names}` : String(playerNames.length);
+  return `I can see ${names}.`;
 }

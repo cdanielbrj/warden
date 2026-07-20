@@ -12,6 +12,7 @@ export interface LadyStatus {
   readonly discordBotId: string;
   readonly gameStatus: GameServerStatus;
   readonly playerNames?: readonly string[];
+  readonly diagnostic?: string;
   readonly checkedAt: string;
 }
 
