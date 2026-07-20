@@ -1,9 +1,9 @@
 # Warden — Architecture and Implementation Guide
 
 **Status:** Accepted baseline  
-**Software version:** 0.3.0
+**Software version:** 0.3.1
 **Architecture baseline:** 0.3
-**Document revision:** 2026-07-19
+**Document revision:** 2026-07-20
 **Initial Lady:** Lady Astra
 **Initial Realm:** Palworld  
 **Runtime:** Docker only  
@@ -16,9 +16,9 @@
 
 Warden is a modular framework for administering dedicated game servers through Discord.
 
-The first implementation is **Lady Astra**, a Discord bot responsible for administering exactly one Palworld server through its local RCON interface. Version 0.3 introduces **Lady Warden**, the Master that aggregates registered Ladies.
+The first implementation is **Lady Astra**, a Discord bot responsible for administering exactly one Palworld server through its local RCON interface. Version 0.3 introduced **Lady Warden**, the Master that persists registered Ladies and aggregates their live status.
 
-The initial project must remain deliberately small. The immediate goal is not to build a universal game-server platform, but to establish a clean foundation that can later support other games, other Ladys, and eventually a central hub called **Lady Warden**.
+The initial project must remain deliberately small. The immediate goal is not to build a universal game-server platform, but to establish a clean foundation that supports other games, other Ladies, and the read-only aggregation provided by **Lady Warden**.
 
 ---
 
@@ -112,18 +112,19 @@ In the Lady runtime, a Warden container never needs to discover or select among 
 
 ### Lady Warden
 
-The future supervisor of the Warden ecosystem.
+The Master supervisor of the Warden ecosystem.
 
 Lady Warden uses the same repository and Docker image as every other Lady, but operates at a different level of authority.
 
-Lady Warden is responsible for cross-Lady and infrastructure concerns such as:
+Lady Warden currently provides:
 
-- Lady health aggregation;
-- maintenance orchestration;
-- schedules and recurring lifecycle operations;
-- container lifecycle through a restricted controller;
-- centralized alerts and audit;
-- coordinated operations across multiple Ladys.
+- persistent SQLite registration of Ladies;
+- authenticated private registration and status APIs;
+- live health and player aggregation through `/servers`, `/lady`, and `/sync`;
+- centralized operational logs for registration and status queries.
+
+Future responsibilities include maintenance orchestration, schedules, restricted
+container lifecycle control, centralized alerts, and coordinated operations.
 
 Lady Warden does not replace individual Ladys and must not implement game-specific behavior directly. Ladys remain autonomous and own all Realm-specific operations.
 
@@ -246,13 +247,19 @@ docker compose exec warden npm run build
 
 ### Runtime configuration
 
-The shared image is configured per Lady through environment variables. Current `0.2.0` Core configuration is common to every Realm:
+The shared image is configured per container through environment variables. The
+common configuration is:
 
 - `ROLE`
-- `REALM`
+- `ID`
 - `DISCORD_TOKEN`
 - `DISCORD_CLIENT_ID`
 - `DISCORD_ADMIN_USER_IDS`
+- `WARDEN_INTERNAL_API_PORT`
+- `WARDEN_INTERNAL_API_TOKEN`
+
+Lady containers additionally require `REALM` and may define `INSTANCE`.
+Master containers use `DATA_PATH` for the persistent SQLite registry.
 
 Each Realm owns the validation of its game-specific needs. Realms that connect through RCON, including the current Palworld Realm, require:
 
@@ -260,13 +267,12 @@ Each Realm owns the validation of its game-specific needs. Realms that connect t
 - `RCON_PORT`
 - `RCON_PASSWORD`
 
-The accepted identity model for a future migration is:
+The implemented identity model is:
 
-- `LADY_ID`: canonical identity such as `astra`, `iris`, or `warden`;
-- `INSTANCE`: stable deployment identifier such as `palworld`, `palworld2`, or `valheim`;
-- `REALM`: game implementation loaded by the Lady.
-
-`ROLE` remains the current implemented field in `0.2.0`. It should eventually become a display name derived from `LADY_ID`, rather than unrestricted identity input.
+- `ID`: canonical identity such as `astra`, `iris`, or `warden`;
+- `INSTANCE`: optional suffix that forms `palworld`, `palworld2`, or `valheim3` with the Realm;
+- `REALM`: game implementation loaded by a Lady;
+- `ROLE`: the `lady` or `master` execution mode.
 
 The root `.env.example` is the single configuration template for a Warden container. It contains shared settings and the connection capabilities currently used by the project. A Realm ignores values it does not use and validates the values it requires.
 
@@ -351,16 +357,17 @@ variables while the fixed container-path contract is sufficient.
 
 ## 6. Current technology choices
 
-Initial stack:
+Current stack:
 
-- Node.js 22 Alpine image
+- Node.js 24 Alpine image
 - TypeScript
 - ECMAScript modules
 - discord.js 14.26.5
 - dotenv
 - tsx for development
 - Docker Compose for local development
-- npm inside the image for the initial version
+- Node's built-in SQLite support for the Master registry
+- authenticated private HTTP APIs between Master and Ladies
 
 Do not introduce additional frameworks or libraries unless they solve an immediate requirement.
 
@@ -368,13 +375,13 @@ In particular, the first phase does not need:
 
 - NestJS;
 - Express;
-- a database;
+- an external database;
 - an ORM;
 - Redis;
 - dependency-injection frameworks;
 - Winston or Pino;
 - a web dashboard;
-- an HTTP API;
+- a public HTTP API;
 - dynamic plugin discovery;
 - a message broker.
 
@@ -382,7 +389,7 @@ In particular, the first phase does not need:
 
 ## 7. Project structure
 
-Target structure for the first phases:
+Current structure:
 
 ```text
 warden/
@@ -390,12 +397,14 @@ warden/
 │   └── Dockerfile
 │
 ├── docs/
-│   └── architecture.md
+│   └── warden-architecture.md
 │
 ├── src/
+│   ├── Bootstrap.ts
+│   ├── index.ts
+│   │
 │   ├── core/
 │   │   ├── bot/
-│   │   │   ├── Bootstrap.ts
 │   │   │   └── Client.ts
 │   │   │
 │   │   ├── config/
@@ -404,23 +413,26 @@ warden/
 │   │   ├── logger/
 │   │   │   └── Logger.ts
 │   │   │
-│   │   ├── realms/
-│   │   │   └── RealmLoader.ts
-│   │   │
+│   │   ├── services/
+│   │   │   ├── discord/
+│   │   │   └── storage/
 │   │   └── types/
 │   │       ├── Command.ts
+│   │       ├── LadyStatus.ts
 │   │       └── Realm.ts
 │   │
-│   ├── realms/
-│   │   └── palworld/
-│   │       ├── commands/
-│   │       ├── config/
-│   │       ├── permissions/
-│   │       ├── services/
-│   │       ├── types/
-│   │       └── index.ts
+│   ├── lady/
+│   │   ├── api/
+│   │   ├── realms/
+│   │   │   ├── RealmLoader.ts
+│   │   │   └── palworld/
+│   │   └── services/
 │   │
-│   └── index.ts
+│   └── warden/
+│       ├── api/
+│       ├── commands/
+│       ├── presentation/
+│       └── services/
 │
 ├── .dockerignore
 ├── .env
@@ -442,41 +454,53 @@ Empty directories should only be created when they are about to receive a real f
 ### Environment variables
 
 ```env
-ROLE=Lady Astra
+ROLE=lady
+ID=astra
 REALM=palworld
+INSTANCE=2
 
 DISCORD_TOKEN=
 DISCORD_CLIENT_ID=
 DISCORD_ADMIN_USER_IDS=
+
+WARDEN_INTERNAL_API_PORT=3000
+WARDEN_INTERNAL_API_TOKEN=
 
 RCON_HOST=
 RCON_PORT=
 RCON_PASSWORD=
 ```
 
-Accepted future identity fields:
+The Master uses the same image with:
 
 ```env
-LADY_ID=astra
-INSTANCE=palworld
+ROLE=master
+ID=warden
+DATA_PATH=/data
+WARDEN_INTERNAL_API_PORT=3000
+WARDEN_INTERNAL_API_TOKEN=
 ```
 
 Definitions:
 
-- `ROLE`: human-readable Lady identity used in logs and responses.
-- `REALM`: Realm loaded by this container.
+- `ROLE`: either `lady` or `master`.
+- `ID`: stable Lady or Master identity, such as `iris` or `warden`.
+- `REALM`: Realm loaded by a Lady container.
+- `INSTANCE`: optional suffix that forms the technical instance ID with the Realm.
 - `DISCORD_TOKEN`: bot token from the Discord Developer Portal.
 - `DISCORD_CLIENT_ID`: Discord Application ID.
 - `DISCORD_ADMIN_USER_IDS`: comma-separated Discord user IDs authorized to administer the Lady.
+- `WARDEN_INTERNAL_API_PORT`: private API port; it is never published to the host.
+- `WARDEN_INTERNAL_API_TOKEN`: shared token used only between Master and Ladies.
+- `MASTER_URL`: optional Master URL; it defaults to `http://lady-warden:3000`.
+- `DATA_PATH`: persistent Master data directory; it defaults to `/data`.
 - `RCON_HOST`, `RCON_PORT`, and `RCON_PASSWORD`: generic RCON connection settings. They are required and validated only by a Realm that uses RCON.
-- `LADY_ID`: planned canonical Lady identity.
-- `INSTANCE`: planned stable Target identifier and storage-directory key.
 
 The Discord Public Key is not required for the gateway-based `discord.js` client used by this project.
 
 The RCON settings are part of the stable container configuration format. A Realm that does not use RCON ignores them.
 
-During startup, the Palworld Realm authenticates against the configured RCON target and executes the safe `Info` query. The implemented Discord commands reuse the same Realm-owned RCON service.
+During startup, the Palworld Realm authenticates against the configured RCON target and executes the safe `Info` query. A Lady then exposes its authenticated private status endpoint and registers with the Master. Registration retries every 10 seconds until the Master confirms it, so Master and Lady startup order is not significant.
 
 Secrets must never be committed.
 
@@ -491,23 +515,25 @@ Expected startup sequence:
 ```text
 1. Start Warden
 2. Read and validate environment variables
-3. Load and initialize the configured Realm
-4. Register the Realm's global Discord commands
-5. Create the Discord client
-6. Connect to Discord
-7. Begin listening for interactions
-8. Report readiness
+3. If ROLE=lady: load and initialize the configured Realm
+4. If ROLE=lady: start the private status API and register with the Master
+5. If ROLE=master: open the persistent Lady registry and registry API
+6. Register the role-specific global Discord commands
+7. Create the Discord client and connect to Discord
+8. Begin listening for interactions and report readiness
 ```
 
 Expected startup logs:
 
 ```text
-[INFO] Starting Warden...
+[INFO] Starting Lady iris for palworld (build v0.3.1).
 [INFO] Authenticating RCON connection to <host>:<port>.
 [SUCCESS] RCON authentication succeeded for <host>:<port>.
+[SUCCESS] Private Lady status API is listening on port 3000.
+[SUCCESS] Registered with the Master.
 [SUCCESS] Registered 6 global Discord command(s).
-[SUCCESS] Logged as Lady Astra#4463
-[SUCCESS] Lady Astra is watching Palworld.
+[SUCCESS] Logged as Lady Iris#0000
+[SUCCESS] Lady iris is watching palworld.
 ```
 
 A missing required environment variable must:
@@ -720,6 +746,13 @@ Suggested output:
 [2026-07-10T18:47:49.507Z] [INFO] Starting Warden...
 ```
 
+The startup message must identify the running role, its ID and instance when
+applicable, and the package build version. Operational logs must record
+Discord command handling, authorization denials, RCON operations, backup and
+configuration writes, and authenticated private API registration and status
+requests. They must remain concise and must not include secrets or setting
+values.
+
 Do not log:
 
 - Discord bot tokens;
@@ -845,7 +878,7 @@ Production configuration must come from environment variables or mounted configu
 Already validated:
 
 - Docker Compose builds the `development` target successfully.
-- The published runtime uses Node.js 22 Alpine, compiled JavaScript, and production dependencies only.
+- The published runtime uses Node.js 24 Alpine, compiled JavaScript, and production dependencies only.
 - TypeScript runs through `tsx watch` only in the Compose development target.
 - `.env` is loaded into the container.
 - `discord.js` version is 14.26.5.
@@ -865,11 +898,16 @@ Already validated:
   source save data intact.
 - Successful state-changing commands publish their outcome in the invoking
   Discord channel, while queries, errors, and confirmations remain private.
+- Lady Warden persists registrations in SQLite and can aggregate live Lady
+  status through authenticated private APIs.
+- Startup logs identify the role, ID or instance, and build version; operational
+  logs cover commands, RCON, backups, configuration writes, and private API
+  activity without printing secrets.
 
 Current successful output is conceptually:
 
 ```text
-[INFO] Starting Warden...
+[INFO] Starting Lady iris for palworld (build v0.3.1).
 [INFO] Authenticating RCON connection to <host>:<port>.
 [SUCCESS] RCON authentication succeeded for <host>:<port>.
 [SUCCESS] Registered 6 global Discord command(s).
@@ -974,9 +1012,14 @@ Completed delivery sequence:
 
 Future work can add a configuration diff, rollback, and restart reporting.
 
-### Future — Lady Warden supervisor
+### Phase 7 — Lady Warden read-only aggregation — Complete
 
-Lady Warden remains out of scope until multiple independent Ladys are stable.
+Lady Warden uses the same repository and Docker image as individual Ladies in
+`ROLE=master`. It persists registrations in SQLite and queries registered
+Ladies through authenticated private APIs. The current commands are `/servers`,
+`/lady`, and `/sync`.
+
+### Future — Lady Warden infrastructure control
 
 Accepted future responsibilities:
 
@@ -986,9 +1029,6 @@ Accepted future responsibilities:
 - orchestration of prepare, stop, container restart, and post-restart validation;
 - centralized alerts and audit;
 - restricted container lifecycle management.
-
-Lady Warden uses the same repository and Docker image as individual Ladys,
-but will be a future supervisor mode rather than a game Realm.
 
 Individual Ladys remain necessary because they own Realm-specific work. Lady Warden must communicate with them through a private authenticated service contract rather than by sending Discord commands or parsing bot messages.
 
@@ -1073,14 +1113,13 @@ Never commit:
 
 ---
 
-## 21. Non-goals for version 0.2.x
+## 21. Non-goals for version 0.3.1
 
 The following capabilities remain outside the immediate Palworld configuration-management delivery:
 
 - multiple servers in one Lady container;
 - multiple Realms in one Lady process;
 - selection menus for server instances;
-- Lady Warden implementation;
 - unrestricted Docker socket access;
 - REST or GraphQL public APIs;
 - a web interface;
@@ -1132,7 +1171,7 @@ When modifying this repository:
 13. Treat this document as the current architectural source of truth.
 14. When code and this document conflict, identify the conflict before changing the architecture.
 15. Update this document when an accepted architectural decision changes.
-16. Treat `LADY_ID`, `REALM`, and `INSTANCE` as separate concepts.
+16. Treat `ID`, `ROLE`, `REALM`, and `INSTANCE` as separate concepts.
 17. Resolve Target files from mounted container roots; never build application paths from `/mnt/user`.
 18. Preserve unknown Palworld settings when parsing and rewriting `OptionSettings`.
 19. Write the real Palworld settings file only through validation, a shared
@@ -1144,7 +1183,15 @@ When modifying this repository:
 
 ## 24. Next task
 
-Discover the Valheim Realm control surface:
+Validate the Master deployment with Lady Iris:
+
+1. publish the `0.3.1` image and update Lady Iris before the Master;
+2. confirm retry registration, `/servers`, `/lady`, and `/sync` after the
+   Master starts;
+3. restart only the Master and confirm its SQLite registry still lists Iris;
+4. update Lady Astra only after the Iris flow is confirmed.
+
+After this integration validation, discover the Valheim Realm control surface:
 
 1. inspect the existing Valheim container for supported remote administration
    and native backup capabilities;

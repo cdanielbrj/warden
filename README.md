@@ -2,7 +2,7 @@
 
 Warden is a Docker-first framework for administering dedicated game servers through Discord.
 
-Current release: **0.3.0**.
+Current release: **0.3.1**.
 
 ## Operating model
 
@@ -42,12 +42,21 @@ DISCORD_TOKEN=
 DISCORD_CLIENT_ID=
 DISCORD_ADMIN_USER_IDS=
 
+WARDEN_INTERNAL_API_PORT=3000
+WARDEN_INTERNAL_API_TOKEN=
+
 RCON_HOST=
 RCON_PORT=
 RCON_PASSWORD=
 ```
 
 `INSTANCE` is optional: `palworld` plus an empty value identifies `palworld`; `palworld` plus `2` identifies `palworld2`. `RCON_*` is a generic connection capability. `DISCORD_ADMIN_USER_IDS` is a comma-separated allowlist; every administrative command is denied by default.
+
+Every Lady and the Master use the same `WARDEN_INTERNAL_API_TOKEN` and join
+`warden_net`. The internal API stays private to that Docker network and its
+port is never published to the host. `MASTER_URL` defaults to
+`http://lady-warden:3000`; override it only when the Master container uses a
+different name.
 
 ## Lady Warden Master
 
@@ -62,6 +71,13 @@ The Master provides three admin-only commands:
 | `/sync` | Rechecks every registered Lady and refreshes its synchronization timestamp. |
 
 Lady and Master containers communicate only through the private `warden_net` Docker network. No internal API port is published to the host.
+
+## Observability
+
+Every bot identifies its role, ID or instance, and build version at startup.
+The container logs also record Discord command handling, RCON operations,
+backups, configuration writes, Lady registration, and private API status
+queries. Logs never include tokens, passwords, or configuration values.
 
 ## Development
 
